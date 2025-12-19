@@ -149,6 +149,7 @@ export const reviewSteps = sqliteTable('review_steps', {
 	status: text('status').notNull(), // not_started, in_progress, reviewed, follow_up
 	diffHunksJson: text('diff_hunks_json').notNull(), // JSON
 	aiGuidanceJson: text('ai_guidance_json'), // JSON
+	aiInlineExplanationsJson: text('ai_inline_explanations_json'), // JSON array of hunk explanations
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()
 		.default(sql`(unixepoch())`),

@@ -16,6 +16,7 @@
 	let activeTab = $state('guidance');
 	let sidebarWidth = $state(400);
 	let isResizing = $state(false);
+	let showAiExplanations = $state(true);
 
 	function startResizing(e: MouseEvent) {
 		isResizing = true;
@@ -56,12 +57,224 @@
 		});
 		
 		if (diffContainer) {
+			// Remove any existing AI explanation blocks first to prevent duplicates
+			diffContainer.querySelectorAll('.ai-explanation-block').forEach(el => el.remove());
+			
 			diffContainer.innerHTML = html;
+			
+			// Inject AI explanation blocks after each hunk if enabled
+			// Use setTimeout to ensure DOM is fully rendered
+			if (showAiExplanations && aiInlineExplanations.length > 0) {
+				setTimeout(() => {
+					injectAiExplanations(diffContainer, diffHunks, aiInlineExplanations);
+				}, 100);
+			}
+		}
+	});
+
+	function injectAiExplanations(
+		container: HTMLElement,
+		hunks: any[],
+		explanations: Array<{ hunkIndex: number; path: string; lineRange: string; explanation: string }>
+	) {
+		if (explanations.length === 0) {
+			console.log('No AI explanations to inject');
+			return;
+		}
+
+		// Remove any existing explanations to prevent duplicates
+		container.querySelectorAll('.ai-explanation-row').forEach(el => el.remove());
+		container.querySelectorAll('.ai-explanation-block').forEach(el => el.remove());
+
+		console.log(`Injecting ${explanations.length} AI explanations`);
+
+		// Detect if we're in side-by-side mode first
+		const sideDiffs = container.querySelectorAll('.d2h-file-side-diff');
+		const isSideBySide = sideDiffs.length === 2;
+		
+		console.log(`Side-by-side mode: ${isSideBySide}, found ${sideDiffs.length} side diffs`);
+
+		// In side-by-side mode, we need to inject into the RIGHT-side table specifically
+		// diff2html creates two separate tables, but hunk header text (@@ ... @@) only shows on left
+		let hunkHeaders: Element[] = [];
+		
+		if (isSideBySide) {
+			// Get the right-side container (second .d2h-file-side-diff)
+			const rightSideContainer = sideDiffs[1] as HTMLElement;
+			
+			// Look for .d2h-info rows in the right side - these are the hunk separator rows
+			const infoRows = rightSideContainer.querySelectorAll('tr.d2h-info, tr');
+			hunkHeaders = Array.from(infoRows).filter(row => {
+				// d2h-info class is used for hunk headers
+				if (row.classList.contains('d2h-info')) return true;
+				// Also check for empty info cells that mark hunk boundaries
+				const cells = row.querySelectorAll('td');
+				return cells.length > 0 && Array.from(cells).some(cell => 
+					cell.classList.contains('d2h-info') || 
+					(cell.textContent || '').includes('@@')
+				);
+			});
+			
+			console.log(`Found ${hunkHeaders.length} hunk info rows in right-side table`);
+			
+			// If still no luck, try finding rows at the same index as left-side hunk headers
+			if (hunkHeaders.length === 0) {
+				const leftSideContainer = sideDiffs[0] as HTMLElement;
+				const leftHunkRows = Array.from(leftSideContainer.querySelectorAll('tr')).filter(row => {
+					const text = row.textContent || '';
+					return /@@\s+-\d+/.test(text);
+				});
+				
+				console.log(`Found ${leftHunkRows.length} hunk headers in left-side table`);
+				
+				// For each left hunk row, find the corresponding row in the right table
+				const rightTable = rightSideContainer.querySelector('table');
+				const leftTable = leftSideContainer.querySelector('table');
+				
+				if (rightTable && leftTable) {
+					const rightRows = rightTable.querySelectorAll('tr');
+					const leftRows = leftTable.querySelectorAll('tr');
+					
+					leftHunkRows.forEach(leftRow => {
+						const leftIndex = Array.from(leftRows).indexOf(leftRow);
+						if (leftIndex >= 0 && leftIndex < rightRows.length) {
+							hunkHeaders.push(rightRows[leftIndex]);
+							console.log(`Mapped left hunk row index ${leftIndex} to right table`);
+						}
+					});
+				}
+			}
+		} else {
+			// Non-side-by-side mode: find hunk headers normally
+			const allRows = container.querySelectorAll('tr');
+			hunkHeaders = Array.from(allRows).filter(row => {
+				const text = row.textContent || '';
+				return /@@\s+-\d+/.test(text);
+			});
+		}
+		
+		console.log(`Final hunk headers count: ${hunkHeaders.length}`);
+
+		if (hunkHeaders.length === 0) {
+			console.warn('Could not find hunk headers, using fallback insertion');
+			// Fallback: Find the first actual code line (not the header) and insert before it
+			const firstCodeLine = container.querySelector('.d2h-code-line, .d2h-code-line-ctn, tr.d2h-code-line');
+			if (firstCodeLine) {
+				const explanation = explanations[0]; // Use first explanation
+				const explanationBlock = document.createElement('div');
+				explanationBlock.className = 'ai-explanation-block';
+				explanationBlock.innerHTML = `
+					<div class="ai-explanation-content">
+						<div class="ai-explanation-header">
+							<svg class="ai-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+							</svg>
+							<span class="ai-badge">AI Explanation</span>
+							${explanation.lineRange ? `<span class="ai-line-range">${explanation.lineRange}</span>` : ''}
+						</div>
+						<div class="ai-explanation-text">${explanation.explanation}</div>
+					</div>
+				`;
+				firstCodeLine.before(explanationBlock);
+			}
+			return;
+		}
+
+		hunkHeaders.forEach((header, index) => {
+			// Since we're already searching only in the right-side container,
+			// we don't need to filter by side again
+			const explanation = explanations.find(e => e.hunkIndex === index);
+			
+			console.log(`Looking for explanation at index ${index}, found: ${!!explanation}`);
+			if (!explanation) return;
+			
+			console.log(`Injecting explanation: ${explanation.explanation.substring(0, 60)}...`);
+
+			// Find the hunk header row
+			let hunkRow: HTMLElement | null = null;
+			let current: Element | null = header;
+			while (current && current !== container) {
+				if (current.tagName === 'TR') {
+					hunkRow = current as HTMLTableRowElement;
+					break;
+				}
+				current = current.parentElement;
+			}
+
+			if (!hunkRow) return;
+
+			// Create explanation element
+			const explanationBlock = document.createElement('div');
+			explanationBlock.className = 'ai-explanation-block-inline';
+			explanationBlock.innerHTML = `
+				<div class="ai-explanation-content">
+					<div class="ai-explanation-header">
+						<svg class="ai-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+						</svg>
+						<span class="ai-badge">AI Explanation</span>
+						${explanation.lineRange ? `<span class="ai-line-range">${explanation.lineRange}</span>` : ''}
+					</div>
+					<div class="ai-explanation-text">${explanation.explanation}</div>
+				</div>
+			`;
+
+			// Create a new row for the explanation
+			const explanationRow = document.createElement('tr');
+			explanationRow.className = 'ai-explanation-row';
+			
+			// In side-by-side mode, we are in a table that ONLY represents one side
+			// So we just need a single td that spans the width of this side's table
+			const cell = document.createElement('td');
+			cell.colSpan = hunkRow.querySelectorAll('td, th').length || 2;
+			cell.className = 'ai-explanation-cell-right';
+			cell.appendChild(explanationBlock);
+			explanationRow.appendChild(cell);
+
+			// Insert AFTER the hunk header row
+			hunkRow.after(explanationRow);
+		});
+	}
+
+	// Toggle explanations visibility when showAiExplanations changes
+	$effect(() => {
+		if (!diffContainer) return;
+		
+		const explanationBlocks = diffContainer.querySelectorAll('.ai-explanation-block');
+		
+		if (showAiExplanations && aiInlineExplanations.length > 0) {
+			// If explanations should be shown but aren't present, re-inject them
+			if (explanationBlocks.length === 0) {
+				const diffHunks = safeParse<any[]>(data.step.diffHunksJson, []);
+				setTimeout(() => {
+					injectAiExplanations(diffContainer, diffHunks, aiInlineExplanations);
+				}, 100);
+			} else {
+				// Show existing blocks
+				explanationBlocks.forEach(block => {
+					(block as HTMLElement).style.display = '';
+				});
+			}
+		} else {
+			// Hide explanation blocks
+			explanationBlocks.forEach(block => {
+				(block as HTMLElement).style.display = 'none';
+			});
 		}
 	});
 
 	let aiGuidance = $derived(safeParse<{ summary: string; risks: any[]; reviewQuestions: string[] }>(data.step.aiGuidanceJson, null as any, 'summary'));
 	let aiSummaryHtml = $derived(aiGuidance ? marked.parse(aiGuidance.summary) : '');
+	let aiInlineExplanations = $derived(safeParse<Array<{ hunkIndex: number; path: string; lineRange: string; explanation: string }>>(data.step.aiInlineExplanationsJson, []));
+
+	// Debug logging
+	$effect(() => {
+		if (aiInlineExplanations.length > 0) {
+			console.log(`Loaded ${aiInlineExplanations.length} AI inline explanations:`, aiInlineExplanations);
+		} else {
+			console.log('No AI inline explanations found. Raw data:', data.step.aiInlineExplanationsJson);
+		}
+	});
 
 	let showNoteForm = $state(false);
 	let noteSeverity = $state('suggestion');
@@ -186,15 +399,29 @@
 
 	<main class="flex-1 flex overflow-hidden">
 		<!-- Main Content (Diff) -->
-		<div class="flex-1 overflow-auto bg-gray-100 p-4 md:p-8">
-			<div class="w-full max-w-[1400px] mx-auto">
+		<div class="flex-1 overflow-auto bg-gray-100 p-2 md:p-4">
+			<div class="w-full max-w-none">
 				<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
 					<div class="px-4 py-2 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
 						<span class="text-xs font-mono text-gray-600">{data.step.title}</span>
-						<div class="flex gap-2">
-							<div class="w-2 h-2 rounded-full bg-red-400"></div>
-							<div class="w-2 h-2 rounded-full bg-yellow-400"></div>
-							<div class="w-2 h-2 rounded-full bg-green-400"></div>
+						<div class="flex items-center gap-3">
+							{#if aiInlineExplanations.length > 0}
+								<button
+									onclick={() => showAiExplanations = !showAiExplanations}
+									class="flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md transition-colors {showAiExplanations ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}"
+									title={showAiExplanations ? 'Hide AI explanations' : 'Show AI explanations'}
+								>
+									<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+									</svg>
+									AI Explanations
+								</button>
+							{/if}
+							<div class="flex gap-2">
+								<div class="w-2 h-2 rounded-full bg-red-400"></div>
+								<div class="w-2 h-2 rounded-full bg-yellow-400"></div>
+								<div class="w-2 h-2 rounded-full bg-green-400"></div>
+							</div>
 						</div>
 					</div>
 					<div bind:this={diffContainer} class="min-w-full overflow-x-auto"></div>
@@ -479,5 +706,98 @@
 	:global(.prose pre) { background-color: #111827; color: #f3f4f6; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; overflow-x: auto; }
 	:global(.prose pre code) { background-color: transparent; padding: 0; color: inherit; font-size: inherit; }
 	:global(.prose blockquote) { border-left-width: 4px; border-color: #e5e7eb; padding-left: 1rem; font-style: italic; margin-top: 1rem; margin-bottom: 1rem; }
+
+	/* AI Explanation Blocks */
+	:global(.ai-explanation-row) {
+		animation: fadeIn 0.3s ease-in;
+	}
+
+	:global(.ai-explanation-cell-right) {
+		padding: 8px 12px !important;
+		background: transparent !important;
+		vertical-align: top;
+	}
+
+	:global(.ai-explanation-cell-full) {
+		padding: 8px 12px !important;
+		background: transparent !important;
+		vertical-align: top;
+	}
+
+	:global(.ai-explanation-spacer) {
+		background: #f8fafc !important;
+	}
+
+	:global(.ai-explanation-block-inline) {
+		margin: 4px 0;
+	}
+
+	:global(.ai-explanation-content) {
+		background: linear-gradient(to right, #eef2ff 0%, #f5f3ff 100%);
+		border-left: 4px solid #6366f1;
+		border-radius: 6px;
+		padding: 12px 16px;
+		margin-left: 0;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+		word-wrap: break-word;
+		white-space: normal;
+		overflow-wrap: break-word;
+	}
+
+	:global(.ai-explanation-header) {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-bottom: 8px;
+	}
+
+	:global(.ai-icon) {
+		width: 16px;
+		height: 16px;
+		color: #6366f1;
+		flex-shrink: 0;
+	}
+
+	:global(.ai-badge) {
+		font-size: 11px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		color: #6366f1;
+		background: rgba(99, 102, 241, 0.1);
+		padding: 2px 8px;
+		border-radius: 4px;
+	}
+
+	:global(.ai-line-range) {
+		font-size: 10px;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+		color: #6b7280;
+		background: rgba(107, 114, 128, 0.1);
+		padding: 2px 6px;
+		border-radius: 3px;
+		margin-left: auto;
+	}
+
+	:global(.ai-explanation-text) {
+		font-size: 13px;
+		line-height: 1.6;
+		color: #374151;
+		font-style: italic;
+		word-wrap: break-word;
+		white-space: normal;
+		overflow-wrap: break-word;
+	}
+
+	@keyframes fadeIn {
+		from {
+			opacity: 0;
+			transform: translateY(-4px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
 </style>
 
