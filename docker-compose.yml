@@ -1,0 +1,69 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: ./docker/web.Dockerfile
+    entrypoint: ["sh", "/app/docker/entrypoint.sh"]
+    command: pnpm dev
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - GITHUB_APP_ID=${GITHUB_APP_ID}
+      - GITHUB_APP_NAME=${GITHUB_APP_NAME}
+      - GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - APP_BASE_URL=http://localhost:3001
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - DATABASE_URL=data/pr-reviewer.db
+      - CHOKIDAR_USEPOLLING=true
+    ports:
+      - "3001:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.svelte-kit
+      - ./data:/app/data
+    depends_on:
+      - redis
+
+  worker:
+    build:
+      context: .
+      dockerfile: ./docker/worker.Dockerfile
+    entrypoint: ["sh", "/app/docker/entrypoint.sh"]
+    command: pnpm worker:dev
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - GITHUB_APP_ID=${GITHUB_APP_ID}
+      - GITHUB_APP_NAME=${GITHUB_APP_NAME}
+      - GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - APP_BASE_URL=http://localhost:3001
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - DATABASE_URL=data/pr-reviewer.db
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.svelte-kit
+      - ./data:/app/data
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
+
