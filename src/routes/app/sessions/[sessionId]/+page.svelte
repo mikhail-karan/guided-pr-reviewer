@@ -40,7 +40,7 @@
 <div class="max-w-5xl mx-auto p-6">
 	<div class="flex items-center justify-between mb-8">
 		<div class="flex items-center gap-4">
-			<a href="/app/repos" class="text-blue-600 hover:underline">← Repos</a>
+			<a href="/app/repos/{data.repo.installationId}" class="text-blue-600 hover:underline">← Repos</a>
 			<h1 class="text-3xl font-bold">Review Plan: {data.pr.title}</h1>
 			<span class="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium">
 				#{data.pr.number}

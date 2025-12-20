@@ -3,15 +3,20 @@ import { createAppAuth } from '@octokit/auth-app';
 import { ENV } from '../env';
 
 export function getAppOctokit(installationId?: string | number) {
+	const auth: any = {
+		appId: ENV.GITHUB_APP_ID,
+		privateKey: ENV.GITHUB_APP_PRIVATE_KEY,
+		clientId: ENV.GITHUB_CLIENT_ID,
+		clientSecret: ENV.GITHUB_CLIENT_SECRET
+	};
+
+	if (installationId) {
+		auth.installationId = installationId;
+	}
+
 	return new Octokit({
 		authStrategy: createAppAuth,
-		auth: {
-			appId: ENV.GITHUB_APP_ID,
-			privateKey: ENV.GITHUB_APP_PRIVATE_KEY,
-			clientId: ENV.GITHUB_CLIENT_ID,
-			clientSecret: ENV.GITHUB_CLIENT_SECRET,
-			installationId
-		}
+		auth
 	});
 }
 

@@ -5,9 +5,19 @@
 </script>
 
 <div class="max-w-4xl mx-auto p-6">
-	<div class="flex items-center gap-4 mb-6">
-		<a href="/app" class="text-blue-600 hover:underline">← Back</a>
-		<h1 class="text-3xl font-bold">Repositories for {data.installation.accountLogin}</h1>
+	<div class="flex items-center justify-between mb-6">
+		<div class="flex items-center gap-4">
+			<a href="/app" class="text-blue-600 hover:underline">← Back</a>
+			<h1 class="text-3xl font-bold">Repositories for {data.installation.accountLogin}</h1>
+		</div>
+		<a
+			href="https://github.com/settings/installations/{data.installation.installationId}"
+			target="_blank"
+			rel="noopener noreferrer"
+			class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md transition"
+		>
+			Manage Repositories
+		</a>
 	</div>
 
 	<div class="grid gap-4">

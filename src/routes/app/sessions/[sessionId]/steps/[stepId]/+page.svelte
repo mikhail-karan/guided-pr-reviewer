@@ -16,6 +16,8 @@
 	let activeTab = $state('guidance');
 	let sidebarWidth = $state(400);
 	let isResizing = $state(false);
+	let diffSplitPercent = $state(50);
+	let isResizingDiff = $state(false);
 	let showAiExplanations = $state(true);
 
 	function startResizing(e: MouseEvent) {
@@ -23,16 +25,30 @@
 		e.preventDefault();
 	}
 
+	function startResizingDiff(e: MouseEvent) {
+		isResizingDiff = true;
+		e.preventDefault();
+	}
+
 	function handleMouseMove(e: MouseEvent) {
-		if (!isResizing) return;
-		const newWidth = window.innerWidth - e.clientX;
-		if (newWidth > 300 && newWidth < 800) {
-			sidebarWidth = newWidth;
+		if (isResizing) {
+			const newWidth = window.innerWidth - e.clientX;
+			if (newWidth > 300 && newWidth < 800) {
+				sidebarWidth = newWidth;
+			}
+		} else if (isResizingDiff) {
+			const rect = diffContainer.getBoundingClientRect();
+			const offsetX = e.clientX - rect.left;
+			const newPercent = (offsetX / rect.width) * 100;
+			if (newPercent > 20 && newPercent < 80) {
+				diffSplitPercent = newPercent;
+			}
 		}
 	}
 
 	function stopResizing() {
 		isResizing = false;
+		isResizingDiff = false;
 	}
 
 	onMount(() => {
@@ -61,6 +77,18 @@
 			diffContainer.querySelectorAll('.ai-explanation-block').forEach(el => el.remove());
 			
 			diffContainer.innerHTML = html;
+
+			// Inject resize handles between side-by-side diffs
+			const diffs = diffContainer.querySelectorAll('.d2h-files-diff');
+			diffs.forEach(diff => {
+				const sides = diff.querySelectorAll('.d2h-file-side-diff');
+				if (sides.length === 2) {
+					const handle = document.createElement('div');
+					handle.className = 'diff-resizer-handle';
+					handle.addEventListener('mousedown', startResizingDiff);
+					sides[0].after(handle);
+				}
+			});
 			
 			// Inject AI explanation blocks after each hunk if enabled
 			// Use setTimeout to ensure DOM is fully rendered
@@ -329,7 +357,7 @@
 	}
 </script>
 
-<div class="h-screen flex flex-col overflow-hidden bg-gray-50 {isResizing ? 'cursor-col-resize select-none' : ''}">
+<div class="h-screen flex flex-col overflow-hidden bg-gray-50 {isResizing || isResizingDiff ? 'cursor-col-resize select-none' : ''} {isResizingDiff ? 'is-resizing-diff' : ''}">
 	<!-- Top Bar -->
 	<header class="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center shrink-0">
 		<div class="flex items-center gap-4">
@@ -424,7 +452,11 @@
 							</div>
 						</div>
 					</div>
-					<div bind:this={diffContainer} class="min-w-full overflow-x-auto"></div>
+					<div 
+						bind:this={diffContainer} 
+						class="min-w-full overflow-x-auto"
+						style="--diff-left-width: {diffSplitPercent}%; --diff-right-width: {100 - diffSplitPercent}%"
+					></div>
 				</div>
 			</div>
 		</div>
@@ -668,10 +700,35 @@
 
 	:global(.d2h-files-diff) {
 		display: flex !important;
+		position: relative;
 	}
 
 	:global(.d2h-file-side-diff) {
 		margin-bottom: 0 !important;
+	}
+
+	:global(.d2h-file-side-diff:first-child) {
+		width: var(--diff-left-width, 50%) !important;
+	}
+
+	:global(.d2h-file-side-diff:last-child) {
+		width: var(--diff-right-width, 50%) !important;
+	}
+
+	:global(.diff-resizer-handle) {
+		width: 4px;
+		background: #e5e7eb;
+		cursor: col-resize;
+		flex-shrink: 0;
+		transition: background 0.2s;
+		z-index: 10;
+		margin: 0 -2px;
+		position: relative;
+	}
+
+	:global(.diff-resizer-handle:hover),
+	:global(.is-resizing-diff .diff-resizer-handle) {
+		background: #3b82f6;
 	}
 
 	:global(.d2h-code-line) {
