@@ -104,3 +104,4 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		userTokenValid: !locals.user || !!locals.user.accessTokenEncrypted // Simple check
 	};
 };
+

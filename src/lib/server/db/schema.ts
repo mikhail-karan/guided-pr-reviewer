@@ -220,6 +220,21 @@ export const draftComments = sqliteTable('draft_comments', {
 		.default(sql`(unixepoch())`)
 });
 
+export const stepChatMessages = sqliteTable('step_chat_messages', {
+	id: text('id').primaryKey(),
+	stepId: text('step_id')
+		.notNull()
+		.references(() => reviewSteps.id),
+	authorUserId: text('author_user_id')
+		.notNull()
+		.references(() => user.id),
+	role: text('role').notNull(), // 'user' | 'assistant'
+	content: text('content').notNull(),
+	createdAt: integer('created_at', { mode: 'timestamp' })
+		.notNull()
+		.default(sql`(unixepoch())`)
+});
+
 // TYPES
 
 export type User = typeof user.$inferSelect;
@@ -234,3 +249,4 @@ export type ReviewStep = typeof reviewSteps.$inferSelect;
 export type ContextPack = typeof contextPacks.$inferSelect;
 export type ReviewerNote = typeof reviewerNotes.$inferSelect;
 export type DraftComment = typeof draftComments.$inferSelect;
+export type StepChatMessage = typeof stepChatMessages.$inferSelect;

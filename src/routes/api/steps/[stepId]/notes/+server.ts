@@ -29,3 +29,4 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 
 	return json(note);
 };
+

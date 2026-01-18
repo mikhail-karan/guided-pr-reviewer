@@ -13,3 +13,4 @@ fi
 
 echo "Starting the application..."
 exec "$@"
+

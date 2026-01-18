@@ -9,6 +9,34 @@
 	let isRegenerating = $state(false);
 	let regenerateMessage = $state<string | null>(null);
 
+	type SortOption = 'default' | 'impact' | 'complexity';
+	let sortBy = $state<SortOption>('impact');
+
+	const complexityOrder = { 'S': 1, 'M': 2, 'L': 3 };
+
+	let sortedSteps = $derived([...data.steps].sort((a, b) => {
+		if (sortBy === 'impact') {
+			const aImpact = safeParse<string[]>(a.riskTags, []).includes('high-impact') ? 1 : 0;
+			const bImpact = safeParse<string[]>(b.riskTags, []).includes('high-impact') ? 1 : 0;
+			if (aImpact !== bImpact) return bImpact - aImpact;
+			// Fallback to complexity if impact is same
+			const aComp = complexityOrder[a.complexity as keyof typeof complexityOrder] || 0;
+			const bComp = complexityOrder[b.complexity as keyof typeof complexityOrder] || 0;
+			if (aComp !== bComp) return bComp - aComp;
+			return a.orderIndex - b.orderIndex;
+		} else if (sortBy === 'complexity') {
+			const aComp = complexityOrder[a.complexity as keyof typeof complexityOrder] || 0;
+			const bComp = complexityOrder[b.complexity as keyof typeof complexityOrder] || 0;
+			if (aComp !== bComp) return bComp - aComp;
+			// Fallback to impact if complexity is same
+			const aImpact = safeParse<string[]>(a.riskTags, []).includes('high-impact') ? 1 : 0;
+			const bImpact = safeParse<string[]>(b.riskTags, []).includes('high-impact') ? 1 : 0;
+			if (aImpact !== bImpact) return bImpact - aImpact;
+			return a.orderIndex - b.orderIndex;
+		}
+		return a.orderIndex - b.orderIndex;
+	}));
+
 	async function regenerateAiGuidance() {
 		isRegenerating = true;
 		regenerateMessage = null;
@@ -40,16 +68,16 @@
 <div class="max-w-5xl mx-auto p-6">
 	<div class="flex items-center justify-between mb-8">
 		<div class="flex items-center gap-4">
-			<a href="/app/repos/{data.repo.installationId}" class="text-blue-600 hover:underline">← Repos</a>
-			<h1 class="text-3xl font-bold">Review Plan: {data.pr.title}</h1>
-			<span class="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium">
+			<a href="/app/repos/{data.repo.installationId}" class="text-blue-600 dark:text-blue-400 hover:underline">← Repos</a>
+			<h1 class="text-3xl font-bold dark:text-gray-100">Review Plan: {data.pr.title}</h1>
+			<span class="bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 px-3 py-1 rounded-full text-sm font-medium border border-gray-200 dark:border-gray-700">
 				#{data.pr.number}
 			</span>
 		</div>
 		<div class="relative">
 			<button
 				onclick={() => showConfigMenu = !showConfigMenu}
-				class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+				class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
 				title="Session settings"
 				aria-label="Session settings"
 			>
@@ -59,12 +87,12 @@
 			</button>
 
 			{#if showConfigMenu}
-				<div class="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+				<div class="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10">
 					<div class="p-2">
 						<button
 							onclick={regenerateAiGuidance}
 							disabled={isRegenerating}
-							class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+							class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
 						>
 							{#if isRegenerating}
 								<svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -80,8 +108,8 @@
 							{/if}
 						</button>
 					</div>
-					<div class="border-t border-gray-200 p-2">
-						<p class="px-4 py-2 text-xs text-gray-500">
+					<div class="border-t border-gray-200 dark:border-gray-700 p-2">
+						<p class="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">
 							This will regenerate AI summaries and inline diff explanations for all steps.
 						</p>
 					</div>
@@ -91,7 +119,7 @@
 	</div>
 
 	{#if regenerateMessage}
-		<div class="mb-6 p-4 rounded-lg {regenerateMessage.includes('Error') ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-blue-50 border border-blue-200 text-blue-700'}">
+		<div class="mb-6 p-4 rounded-lg {regenerateMessage.includes('Error') ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300' : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300'}">
 			<div class="flex items-center gap-2">
 				{#if regenerateMessage.includes('Error')}
 					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -108,15 +136,15 @@
 	{/if}
 
 	{#if data.session.isStale}
-		<div class="bg-amber-50 border-l-4 border-amber-400 p-4 mb-8">
+		<div class="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 dark:border-amber-600 p-4 mb-8">
 			<div class="flex">
 				<div class="shrink-0">
-					<svg class="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+					<svg class="h-5 w-5 text-amber-400 dark:text-amber-500" viewBox="0 0 20 20" fill="currentColor">
 						<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
 					</svg>
 				</div>
 				<div class="ml-3">
-					<p class="text-sm text-amber-700">
+					<p class="text-sm text-amber-700 dark:text-amber-300">
 						This review session is based on an older commit ({data.session.headSha.substring(0, 7)}). 
 						New changes are available on GitHub.
 					</p>
@@ -128,36 +156,68 @@
 	<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 		<div class="lg:col-span-2">
 			<section class="mb-8">
-				<h2 class="text-xl font-semibold mb-4">Review Steps</h2>
+				<div class="flex items-center justify-between mb-4">
+					<h2 class="text-xl font-semibold dark:text-gray-100">Review Steps</h2>
+					<div class="flex items-center gap-2">
+						<span class="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">Sort by:</span>
+						<div class="flex bg-gray-100 dark:bg-gray-800 rounded-md p-1">
+							<button
+								onclick={() => sortBy = 'default'}
+								class="px-3 py-1 text-xs font-medium rounded {sortBy === 'default' ? 'bg-white dark:bg-gray-700 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}"
+							>
+								Order
+							</button>
+							<button
+								onclick={() => sortBy = 'impact'}
+								class="px-3 py-1 text-xs font-medium rounded {sortBy === 'impact' ? 'bg-white dark:bg-gray-700 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}"
+							>
+								Impact
+							</button>
+							<button
+								onclick={() => sortBy = 'complexity'}
+								class="px-3 py-1 text-xs font-medium rounded {sortBy === 'complexity' ? 'bg-white dark:bg-gray-700 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}"
+							>
+								Complexity
+							</button>
+						</div>
+					</div>
+				</div>
+
 				{#if data.steps.length === 0}
-					<div class="bg-white border border-dashed border-gray-300 rounded-lg p-12 text-center">
+					<div class="bg-white dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-12 text-center">
 						<div class="animate-pulse flex flex-col items-center">
-							<div class="h-4 w-48 bg-gray-200 rounded mb-4"></div>
-							<p class="text-gray-500">Generating review steps... this may take a minute.</p>
+							<div class="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+							<p class="text-gray-500 dark:text-gray-400">Generating review steps... this may take a minute.</p>
 						</div>
 					</div>
 				{:else}
 					<div class="space-y-4">
-						{#each data.steps as step}
+						{#each sortedSteps as step}
 							<a
 								href="/app/sessions/{data.session.id}/steps/{step.id}"
-								class="block bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 transition shadow-sm"
+								class="block bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-blue-500 dark:hover:border-blue-400 transition shadow-sm"
 							>
 								<div class="flex justify-between items-start mb-2">
-									<h3 class="font-bold text-lg">{step.orderIndex + 1}. {step.title}</h3>
-									<span class="px-2 py-1 rounded text-xs font-bold uppercase" class:bg-gray-100={step.status === 'not_started'} class:bg-blue-100={step.status === 'in_progress'} class:bg-green-100={step.status === 'reviewed'}>
+									<h3 class="font-bold text-lg dark:text-gray-100">{step.orderIndex + 1}. {step.title}</h3>
+									<span 
+										class="px-2 py-1 rounded text-xs font-bold uppercase {
+											step.status === 'not_started' ? 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200' : 
+											step.status === 'in_progress' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300' : 
+											step.status === 'reviewed' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : ''
+										}"
+									>
 										{step.status.replace('_', ' ')}
 									</span>
 								</div>
 								<div class="flex gap-2 mb-3">
-									<span class="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600">Complexity: {step.complexity}</span>
+									<span class="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded text-gray-600 dark:text-gray-400">Complexity: {step.complexity}</span>
 									{#if step.riskTags}
 										{#each safeParse(step.riskTags, []) as tag}
-											<span class="text-xs bg-red-50 px-2 py-0.5 rounded text-red-600">#{tag}</span>
+											<span class="text-xs bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded text-red-600 dark:text-red-400">#{tag}</span>
 										{/each}
 									{/if}
 								</div>
-								<p class="text-sm text-gray-600 line-clamp-2">
+								<p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
 									{step.category}
 								</p>
 							</a>
@@ -168,31 +228,31 @@
 		</div>
 
 		<div class="lg:col-span-1">
-			<section class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mb-8">
-				<h2 class="text-lg font-semibold mb-4 border-b pb-2">PR Summary</h2>
+			<section class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm mb-8">
+				<h2 class="text-lg font-semibold mb-4 border-b dark:border-gray-700 pb-2 dark:text-gray-100">PR Summary</h2>
 				{#if prSummary}
-					<div class="prose prose-sm max-w-none whitespace-pre-wrap text-sm text-gray-700">
+					<div class="prose prose-sm max-w-none whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">
 						{prSummary.overview || 'AI summary not yet generated.'}
 					</div>
 				{:else}
-					<p class="text-sm text-gray-500 italic">Summary is being generated...</p>
+					<p class="text-sm text-gray-500 dark:text-gray-400 italic">Summary is being generated...</p>
 				{/if}
 			</section>
 
-			<section class="bg-gray-50 border border-gray-200 rounded-lg p-6">
-				<h2 class="text-lg font-semibold mb-4">Metadata</h2>
+			<section class="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+				<h2 class="text-lg font-semibold mb-4 dark:text-gray-100">Metadata</h2>
 				<dl class="space-y-2 text-sm">
 					<div>
-						<dt class="text-gray-500">Author</dt>
-						<dd class="font-medium">{data.pr.authorLogin}</dd>
+						<dt class="text-gray-500 dark:text-gray-400">Author</dt>
+						<dd class="font-medium dark:text-gray-200">{data.pr.authorLogin}</dd>
 					</div>
 					<div>
-						<dt class="text-gray-500">Base</dt>
-						<dd class="font-medium font-mono">{data.pr.baseRef}</dd>
+						<dt class="text-gray-500 dark:text-gray-400">Base</dt>
+						<dd class="font-medium font-mono dark:text-gray-200">{data.pr.baseRef}</dd>
 					</div>
 					<div>
-						<dt class="text-gray-500">Head</dt>
-						<dd class="font-medium font-mono">{data.pr.headRef} ({data.pr.headSha.substring(0, 7)})</dd>
+						<dt class="text-gray-500 dark:text-gray-400">Head</dt>
+						<dd class="font-medium font-mono dark:text-gray-200">{data.pr.headRef} ({data.pr.headSha.substring(0, 7)})</dd>
 					</div>
 				</dl>
 			</section>

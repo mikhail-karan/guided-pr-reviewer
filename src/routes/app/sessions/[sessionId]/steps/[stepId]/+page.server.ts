@@ -1,6 +1,6 @@
 import { db } from '$lib/server/db';
 import * as table from '$lib/server/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, asc } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
@@ -49,6 +49,13 @@ export const load: PageServerLoad = async ({ params }) => {
 		.where(eq(table.draftComments.stepId, params.stepId))
 		.all();
 
+	const chatMessages = await db
+		.select()
+		.from(table.stepChatMessages)
+		.where(eq(table.stepChatMessages.stepId, params.stepId))
+		.orderBy(asc(table.stepChatMessages.createdAt))
+		.all();
+
 	const allSteps = await db
 		.select({ id: table.reviewSteps.id, orderIndex: table.reviewSteps.orderIndex })
 		.from(table.reviewSteps)
@@ -68,6 +75,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		contextPack,
 		notes,
 		draftComments,
+		chatMessages,
 		prevStepId: prevStep?.id,
 		nextStepId: nextStep?.id,
 		totalSteps: allSteps.length,
@@ -95,4 +103,5 @@ export const actions: Actions = {
 		return { success: true };
 	}
 };
+
 
