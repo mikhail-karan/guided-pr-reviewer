@@ -11,6 +11,7 @@
 	import { highlightDiffContainer } from '$lib/utils/diff-highlighter';
 	import { getShikiTheme } from '$lib/utils/shiki-theme';
 	import type { PageData } from './$types';
+	import type { DraftComment } from '$lib/server/db/schema';
 
 	let { data }: { data: PageData } = $props();
 
@@ -31,6 +32,29 @@
 	let isStreaming = $state(false);
 	let streamingMessageId = $state<string | null>(null);
 	let chatContainer = $state<HTMLElement | null>(null);
+
+	// Inline comment state
+	interface LineInfo {
+		path: string;
+		line: number;
+		startLine: number | null;
+		side: 'LEFT' | 'RIGHT';
+		rowElement: HTMLElement;
+	}
+	let activeInlineComment = $state<LineInfo | null>(null);
+	let inlineCommentFormContainer = $state<HTMLElement | null>(null);
+	let selectionStartLine = $state<{ line: number; side: 'LEFT' | 'RIGHT'; path: string } | null>(null);
+
+	// Get inline comments grouped by path and line
+	let inlineComments = $derived(
+		(draftComments as DraftComment[]).filter(c => c.targetType === 'inline' && c.path && c.line)
+	);
+
+	function getCommentsForLine(path: string, line: number, side: string): DraftComment[] {
+		return inlineComments.filter(
+			c => c.path === path && c.line === line && c.side === side
+		);
+	}
 
 	function startResizing(e: MouseEvent) {
 		isResizing = true;
@@ -118,8 +142,449 @@
 					injectAiExplanations(diffContainer, diffHunks, aiInlineExplanations);
 				}, 100);
 			}
+
+			// Add inline comment click handlers to diff lines
+			setTimeout(() => {
+				addLineClickHandlers(diffContainer, diffHunks);
+				injectExistingInlineComments(diffContainer, diffHunks);
+			}, 150);
 		}
 	});
+
+	// Extract line information from a diff row element
+	function extractLineInfo(row: HTMLElement, hunks: any[], side: 'LEFT' | 'RIGHT'): LineInfo | null {
+		// Find the line number cell
+		const lineNumCell = row.querySelector('.d2h-code-side-linenumber');
+		if (!lineNumCell) return null;
+
+		const lineNumText = lineNumCell.textContent?.trim();
+		if (!lineNumText || lineNumText === '') return null;
+
+		const lineNum = parseInt(lineNumText, 10);
+		if (isNaN(lineNum)) return null;
+
+		// Find the file path - traverse up to find file wrapper and get the path
+		let fileWrapper = row.closest('.d2h-file-wrapper');
+		if (!fileWrapper) return null;
+
+		const fileHeader = fileWrapper.querySelector('.d2h-file-name');
+		let path = fileHeader?.textContent?.trim() || '';
+
+		// diff2html sometimes shows paths like "a/path/to/file" or "b/path/to/file"
+		// Remove the a/ or b/ prefix if present
+		if (path.startsWith('a/') || path.startsWith('b/')) {
+			path = path.substring(2);
+		}
+
+		// Also try to get path from hunks if header is not helpful
+		if (!path && hunks.length > 0) {
+			path = hunks[0].path;
+		}
+
+		return {
+			path,
+			line: lineNum,
+			startLine: null,
+			side,
+			rowElement: row
+		};
+	}
+
+	// Highlight specific lines in the diff viewer (used for risk hover)
+	function highlightDiffLines(lines: Array<{ path: string; startLine: number; endLine: number }>) {
+		if (!diffContainer || !lines || lines.length === 0) return;
+
+		const fileWrappers = diffContainer.querySelectorAll('.d2h-file-wrapper');
+
+		for (const lineRef of lines) {
+			for (const fileWrapper of Array.from(fileWrappers)) {
+				const fileHeader = fileWrapper.querySelector('.d2h-file-name');
+				let filePath = fileHeader?.textContent?.trim() || '';
+				if (filePath.startsWith('a/') || filePath.startsWith('b/')) {
+					filePath = filePath.substring(2);
+				}
+
+				if (filePath !== lineRef.path) continue;
+
+				// Search both sides of the side-by-side diff (right side = new file lines)
+				const sideDiffs = fileWrapper.querySelectorAll('.d2h-file-side-diff');
+				sideDiffs.forEach((sideDiff) => {
+					const rows = sideDiff.querySelectorAll('tr');
+					rows.forEach((row) => {
+						const lineNumCell = row.querySelector('.d2h-code-side-linenumber');
+						if (!lineNumCell) return;
+
+						const lineNumText = lineNumCell.textContent?.trim();
+						if (!lineNumText) return;
+
+						const lineNum = parseInt(lineNumText, 10);
+						if (isNaN(lineNum)) return;
+
+						if (lineNum >= lineRef.startLine && lineNum <= lineRef.endLine) {
+							row.classList.add('risk-highlight');
+						}
+					});
+				});
+			}
+		}
+	}
+
+	// Scroll the diff viewer to the first highlighted risk line (right side)
+	function scrollToRiskLines(lines: Array<{ path: string; startLine: number; endLine: number }>) {
+		if (!diffContainer || !lines || lines.length === 0) return;
+
+		const lineRef = lines[0];
+		const fileWrappers = diffContainer.querySelectorAll('.d2h-file-wrapper');
+
+		for (const fileWrapper of Array.from(fileWrappers)) {
+			const fileHeader = fileWrapper.querySelector('.d2h-file-name');
+			let filePath = fileHeader?.textContent?.trim() || '';
+			if (filePath.startsWith('a/') || filePath.startsWith('b/')) {
+				filePath = filePath.substring(2);
+			}
+			if (filePath !== lineRef.path) continue;
+
+			// Target the right side (new file) of the side-by-side diff
+			const sideDiffs = fileWrapper.querySelectorAll('.d2h-file-side-diff');
+			const rightSide = sideDiffs.length >= 2 ? sideDiffs[1] : sideDiffs[0];
+			if (!rightSide) continue;
+
+			const rows = rightSide.querySelectorAll('tr');
+			for (const row of Array.from(rows)) {
+				const lineNumCell = row.querySelector('.d2h-code-side-linenumber');
+				if (!lineNumCell) continue;
+				const lineNum = parseInt(lineNumCell.textContent?.trim() || '', 10);
+				if (isNaN(lineNum)) continue;
+
+				if (lineNum >= lineRef.startLine && lineNum <= lineRef.endLine) {
+					row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+					return;
+				}
+			}
+		}
+	}
+
+	// Remove all risk highlight classes from the diff viewer
+	function clearDiffHighlights() {
+		if (!diffContainer) return;
+		diffContainer.querySelectorAll('.risk-highlight').forEach((el) => {
+			el.classList.remove('risk-highlight');
+		});
+	}
+
+	// Add click handlers to diff line numbers
+	function addLineClickHandlers(container: HTMLElement, hunks: any[]) {
+		const sideDiffs = container.querySelectorAll('.d2h-file-side-diff');
+
+		sideDiffs.forEach((sideDiff, index) => {
+			const side: 'LEFT' | 'RIGHT' = index === 0 ? 'LEFT' : 'RIGHT';
+			const rows = sideDiff.querySelectorAll('tr');
+
+			rows.forEach(row => {
+				const lineNumCell = row.querySelector('.d2h-code-side-linenumber');
+				if (!lineNumCell) return;
+
+				const lineNumText = lineNumCell.textContent?.trim();
+				if (!lineNumText || lineNumText === '') return;
+
+				// Add click handler
+				lineNumCell.addEventListener('click', (e: Event) => {
+					e.stopPropagation();
+					const mouseEvent = e as MouseEvent;
+					const lineInfo = extractLineInfo(row as HTMLElement, hunks, side);
+					if (lineInfo) {
+						// Handle shift+click for multi-line selection
+						if (mouseEvent.shiftKey && selectionStartLine && selectionStartLine.side === side && selectionStartLine.path === lineInfo.path) {
+							const startLine = Math.min(selectionStartLine.line, lineInfo.line);
+							const endLine = Math.max(selectionStartLine.line, lineInfo.line);
+							openInlineCommentForm({
+								...lineInfo,
+								line: endLine,
+								startLine: startLine !== endLine ? startLine : null
+							});
+							selectionStartLine = null;
+						} else {
+							selectionStartLine = { line: lineInfo.line, side, path: lineInfo.path };
+							openInlineCommentForm(lineInfo);
+						}
+					}
+				});
+
+				// Add hover visual indicator
+				lineNumCell.classList.add('inline-comment-trigger');
+
+				// Check if this line has existing comments
+				const lineInfo = extractLineInfo(row as HTMLElement, hunks, side);
+				if (lineInfo) {
+					const existingComments = getCommentsForLine(lineInfo.path, lineInfo.line, side);
+					if (existingComments.length > 0) {
+						lineNumCell.classList.add('has-comments');
+						const badge = document.createElement('span');
+						badge.className = 'comment-count-badge';
+						badge.textContent = existingComments.length.toString();
+						lineNumCell.appendChild(badge);
+					}
+				}
+			});
+		});
+	}
+
+	// Open inline comment form at the specified line
+	function openInlineCommentForm(lineInfo: LineInfo) {
+		// Close any existing form first
+		closeInlineCommentForm();
+
+		activeInlineComment = lineInfo;
+
+		// Create a container for the form and insert it after the row
+		const formRow = document.createElement('tr');
+		formRow.className = 'inline-comment-form-row';
+
+		const formCell = document.createElement('td');
+		formCell.colSpan = 2;
+		formCell.className = 'inline-comment-form-cell';
+
+		const lineRangeText = lineInfo.startLine && lineInfo.startLine !== lineInfo.line
+			? `Lines ${lineInfo.startLine}-${lineInfo.line}`
+			: `Line ${lineInfo.line}`;
+
+		formCell.innerHTML = `
+			<div class="inline-comment-form">
+				<div class="form-header">
+					<span class="location-badge">
+						${lineRangeText}
+						<span class="side-badge">${lineInfo.side}</span>
+					</span>
+					<button type="button" class="close-btn" aria-label="Close">
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+						</svg>
+					</button>
+				</div>
+				<textarea
+					class="comment-textarea"
+					placeholder="Leave a comment..."
+					rows="3"
+				></textarea>
+				<div class="form-footer">
+					<span class="hint">
+						<kbd>Cmd</kbd>+<kbd>Enter</kbd> to submit, <kbd>Esc</kbd> to cancel
+					</span>
+					<div class="form-actions">
+						<button type="button" class="btn-cancel">Cancel</button>
+						<button type="button" class="btn-submit" disabled>Add comment</button>
+					</div>
+				</div>
+			</div>
+		`;
+
+		// Add event listeners
+		const closeBtn = formCell.querySelector('.close-btn');
+		const cancelBtn = formCell.querySelector('.btn-cancel');
+		const submitBtn = formCell.querySelector('.btn-submit') as HTMLButtonElement;
+		const textarea = formCell.querySelector('.comment-textarea') as HTMLTextAreaElement;
+
+		closeBtn?.addEventListener('click', closeInlineCommentForm);
+		cancelBtn?.addEventListener('click', closeInlineCommentForm);
+
+		textarea?.addEventListener('input', () => {
+			submitBtn.disabled = !textarea.value.trim();
+		});
+
+		textarea?.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape') {
+				closeInlineCommentForm();
+			} else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+				e.preventDefault();
+				if (textarea.value.trim()) {
+					submitInlineComment(lineInfo, textarea.value.trim());
+				}
+			}
+		});
+
+		submitBtn?.addEventListener('click', () => {
+			if (textarea.value.trim()) {
+				submitInlineComment(lineInfo, textarea.value.trim());
+			}
+		});
+
+		formRow.appendChild(formCell);
+		lineInfo.rowElement.after(formRow);
+
+		inlineCommentFormContainer = formCell;
+
+		// Focus the textarea
+		setTimeout(() => textarea?.focus(), 50);
+	}
+
+	// Submit an inline comment
+	async function submitInlineComment(lineInfo: LineInfo, content: string) {
+		const submitBtn = inlineCommentFormContainer?.querySelector('.btn-submit') as HTMLButtonElement;
+		const textarea = inlineCommentFormContainer?.querySelector('.comment-textarea') as HTMLTextAreaElement;
+
+		if (submitBtn) {
+			submitBtn.disabled = true;
+			submitBtn.textContent = 'Adding...';
+		}
+
+		try {
+			const res = await fetch(`/api/steps/${data.step.id}/draft-comments`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					targetType: 'inline',
+					bodyMarkdown: content,
+					path: lineInfo.path,
+					side: lineInfo.side,
+					line: lineInfo.line,
+					startLine: lineInfo.startLine
+				})
+			});
+
+			if (res.ok) {
+				const newComment = await res.json();
+				draftComments = [...draftComments, newComment];
+				closeInlineCommentForm();
+
+				// Refresh comment indicators
+				refreshCommentIndicators();
+			} else {
+				console.error('Failed to submit comment');
+				if (submitBtn) {
+					submitBtn.disabled = false;
+					submitBtn.textContent = 'Add comment';
+				}
+			}
+		} catch (err) {
+			console.error('Error submitting comment:', err);
+			if (submitBtn) {
+				submitBtn.disabled = false;
+				submitBtn.textContent = 'Add comment';
+			}
+		}
+	}
+
+	// Refresh comment indicators after adding a new comment
+	function refreshCommentIndicators() {
+		const diffHunks = safeParse<any[]>(data.step.diffHunksJson, []);
+		if (!diffContainer) return;
+
+		const sideDiffs = diffContainer.querySelectorAll('.d2h-file-side-diff');
+		sideDiffs.forEach((sideDiff, index) => {
+			const side = index === 0 ? 'LEFT' : 'RIGHT';
+			const rows = sideDiff.querySelectorAll('tr:not(.inline-comment-form-row):not(.inline-comment-thread-row)');
+
+			rows.forEach(row => {
+				const lineNumCell = row.querySelector('.d2h-code-side-linenumber');
+				if (!lineNumCell) return;
+
+				const lineInfo = extractLineInfo(row as HTMLElement, diffHunks, side as 'LEFT' | 'RIGHT');
+				if (!lineInfo) return;
+
+				const existingComments = getCommentsForLine(lineInfo.path, lineInfo.line, side);
+				const existingBadge = lineNumCell.querySelector('.comment-count-badge');
+
+				if (existingComments.length > 0) {
+					lineNumCell.classList.add('has-comments');
+					if (existingBadge) {
+						existingBadge.textContent = existingComments.length.toString();
+					} else {
+						const badge = document.createElement('span');
+						badge.className = 'comment-count-badge';
+						badge.textContent = existingComments.length.toString();
+						lineNumCell.appendChild(badge);
+					}
+				} else {
+					lineNumCell.classList.remove('has-comments');
+					existingBadge?.remove();
+				}
+			});
+		});
+
+		// Re-inject comment threads
+		injectExistingInlineComments(diffContainer, diffHunks);
+	}
+
+	// Close the inline comment form
+	function closeInlineCommentForm() {
+		if (inlineCommentFormContainer) {
+			const formRow = inlineCommentFormContainer.closest('tr');
+			if (formRow) {
+				formRow.remove();
+			}
+		}
+		activeInlineComment = null;
+		inlineCommentFormContainer = null;
+	}
+
+	// Inject existing inline comments into the diff view
+	function injectExistingInlineComments(container: HTMLElement, hunks: any[]) {
+		// Group comments by path, line, and side
+		const commentGroups = new Map<string, DraftComment[]>();
+
+		inlineComments.forEach(comment => {
+			const key = `${comment.path}:${comment.line}:${comment.side}`;
+			if (!commentGroups.has(key)) {
+				commentGroups.set(key, []);
+			}
+			commentGroups.get(key)!.push(comment);
+		});
+
+		if (commentGroups.size === 0) return;
+
+		const sideDiffs = container.querySelectorAll('.d2h-file-side-diff');
+
+		sideDiffs.forEach((sideDiff, index) => {
+			const side = index === 0 ? 'LEFT' : 'RIGHT';
+			const rows = sideDiff.querySelectorAll('tr');
+
+			rows.forEach(row => {
+				const lineInfo = extractLineInfo(row as HTMLElement, hunks, side as 'LEFT' | 'RIGHT');
+				if (!lineInfo) return;
+
+				const key = `${lineInfo.path}:${lineInfo.line}:${side}`;
+				const comments = commentGroups.get(key);
+
+				if (comments && comments.length > 0) {
+					// Check if thread row already exists
+					const nextRow = row.nextElementSibling;
+					if (nextRow?.classList.contains('inline-comment-thread-row')) return;
+
+					// Create a row for the comment thread
+					const threadRow = document.createElement('tr');
+					threadRow.className = 'inline-comment-thread-row';
+
+					const threadCell = document.createElement('td');
+					threadCell.colSpan = 2;
+					threadCell.className = 'inline-comment-thread-cell';
+
+					// Create a simple thread display
+					const threadDiv = document.createElement('div');
+					threadDiv.className = 'inline-thread-container';
+					threadDiv.innerHTML = `
+						<div class="inline-thread-header">
+							<svg class="thread-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+							</svg>
+							<span>${comments.length} comment${comments.length !== 1 ? 's' : ''}</span>
+						</div>
+						<div class="inline-thread-comments">
+							${comments.map(c => `
+								<div class="inline-thread-comment">
+									<span class="comment-status status-${c.status}">${c.status}</span>
+									<div class="comment-body">${c.bodyMarkdown}</div>
+								</div>
+							`).join('')}
+						</div>
+					`;
+
+					threadCell.appendChild(threadDiv);
+					threadRow.appendChild(threadCell);
+					row.after(threadRow);
+				}
+			});
+		});
+	}
 
 	function injectAiExplanations(
 		container: HTMLElement,
@@ -672,8 +1137,8 @@
 							</div>
 						</div>
 					</div>
-					<div 
-						bind:this={diffContainer} 
+					<div
+						bind:this={diffContainer}
 						class="min-w-full overflow-x-auto diff-container"
 						style="--diff-left-width: {diffSplitPercent}%; --diff-right-width: {100 - diffSplitPercent}%"
 					></div>
@@ -739,8 +1204,22 @@
 												<h3 class="text-sm font-bold uppercase text-gray-400 dark:text-gray-500 mb-2 tracking-wider">Potential Risks</h3>
 												<ul class="space-y-2">
 													{#each aiGuidance.risks as risk}
-														<li class="text-sm bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 dark:border-red-600 p-2 text-red-700 dark:text-red-300">
-															{risk.description}
+														<li
+															class="text-sm bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 dark:border-red-600 p-2 text-red-700 dark:text-red-300 {risk.lines?.length ? 'cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors' : ''}"
+															onmouseenter={() => { if (risk.lines?.length) highlightDiffLines(risk.lines); }}
+															onmouseleave={() => clearDiffHighlights()}
+															onclick={() => { if (risk.lines?.length) { highlightDiffLines(risk.lines); scrollToRiskLines(risk.lines); } }}
+														>
+															<span>{risk.description}</span>
+															{#if risk.lines?.length}
+																<div class="flex flex-wrap gap-1 mt-1.5">
+																	{#each risk.lines as line}
+																		<span class="inline-flex items-center text-[10px] font-mono bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded">
+																			{line.path.split('/').pop()}:{line.startLine}-{line.endLine}
+																		</span>
+																	{/each}
+																</div>
+															{/if}
 														</li>
 													{/each}
 												</ul>
@@ -1027,6 +1506,23 @@
 </div>
 
 <style>
+	/* Risk hover highlight on diff lines */
+	:global(tr.risk-highlight td) {
+		background-color: rgba(239, 68, 68, 0.15) !important;
+		transition: background-color 0.15s ease;
+	}
+	:global(.dark) :global(tr.risk-highlight td) {
+		background-color: rgba(239, 68, 68, 0.2) !important;
+	}
+	:global(tr.risk-highlight .d2h-code-side-linenumber) {
+		background-color: rgba(239, 68, 68, 0.25) !important;
+		color: #ef4444 !important;
+	}
+	:global(.dark) :global(tr.risk-highlight .d2h-code-side-linenumber) {
+		background-color: rgba(239, 68, 68, 0.3) !important;
+		color: #f87171 !important;
+	}
+
 	/* Fix for diff2html side-by-side on narrow containers */
 	:global(.d2h-file-wrapper) {
 		margin-bottom: 0 !important;
@@ -1069,6 +1565,285 @@
 	:global(.diff-resizer-handle:hover),
 	:global(.is-resizing-diff .diff-resizer-handle) {
 		background: #3b82f6;
+	}
+
+	/* Inline comment trigger styles */
+	:global(.inline-comment-trigger) {
+		cursor: pointer;
+		position: relative;
+		transition: background-color 0.15s ease;
+	}
+
+	:global(.inline-comment-trigger:hover) {
+		background-color: #ddf4ff !important;
+	}
+
+	:global(.inline-comment-trigger:hover::before) {
+		content: '+';
+		position: absolute;
+		left: 4px;
+		top: 50%;
+		transform: translateY(-50%);
+		font-size: 14px;
+		font-weight: 700;
+		color: #0969da;
+		width: 16px;
+		height: 16px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: #ddf4ff;
+		border-radius: 3px;
+	}
+
+	:global(.inline-comment-trigger.has-comments) {
+		background-color: #fff8c5 !important;
+	}
+
+	:global(.comment-count-badge) {
+		position: absolute;
+		right: 4px;
+		top: 50%;
+		transform: translateY(-50%);
+		background: #bf8700;
+		color: white;
+		font-size: 10px;
+		font-weight: 700;
+		min-width: 16px;
+		height: 16px;
+		border-radius: 8px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0 4px;
+	}
+
+	/* Inline comment form row */
+	:global(.inline-comment-form-row) {
+		animation: slideDown 0.2s ease-out;
+	}
+
+	:global(.inline-comment-form-cell) {
+		padding: 8px 12px !important;
+		background: #f6f8fa !important;
+	}
+
+	:global(.inline-comment-form) {
+		background: white;
+		border: 1px solid #d0d7de;
+		border-radius: 6px;
+		box-shadow: 0 4px 12px rgba(140, 149, 159, 0.15);
+		overflow: hidden;
+		max-width: 600px;
+	}
+
+	:global(.inline-comment-form .form-header) {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 8px 12px;
+		background: #f6f8fa;
+		border-bottom: 1px solid #d0d7de;
+	}
+
+	:global(.inline-comment-form .location-badge) {
+		font-size: 12px;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+		color: #57606a;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	:global(.inline-comment-form .side-badge) {
+		font-size: 10px;
+		padding: 2px 6px;
+		border-radius: 3px;
+		background: #ddf4ff;
+		color: #0969da;
+		font-weight: 600;
+	}
+
+	:global(.inline-comment-form .close-btn) {
+		padding: 4px;
+		border: none;
+		background: transparent;
+		cursor: pointer;
+		color: #57606a;
+		border-radius: 4px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	:global(.inline-comment-form .close-btn:hover) {
+		background: #d0d7de;
+		color: #24292f;
+	}
+
+	:global(.inline-comment-form .comment-textarea) {
+		width: 100%;
+		border: none;
+		padding: 12px;
+		font-size: 13px;
+		resize: vertical;
+		min-height: 80px;
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+	}
+
+	:global(.inline-comment-form .comment-textarea:focus) {
+		outline: none;
+	}
+
+	:global(.inline-comment-form .form-footer) {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 8px 12px;
+		background: #f6f8fa;
+		border-top: 1px solid #d0d7de;
+	}
+
+	:global(.inline-comment-form .hint) {
+		font-size: 11px;
+		color: #8b949e;
+	}
+
+	:global(.inline-comment-form .hint kbd) {
+		padding: 2px 5px;
+		background: #f6f8fa;
+		border: 1px solid #d0d7de;
+		border-radius: 3px;
+		font-size: 10px;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	}
+
+	:global(.inline-comment-form .form-actions) {
+		display: flex;
+		gap: 8px;
+	}
+
+	:global(.inline-comment-form .btn-cancel) {
+		padding: 5px 12px;
+		font-size: 12px;
+		font-weight: 600;
+		border: 1px solid #d0d7de;
+		border-radius: 6px;
+		background: #f6f8fa;
+		color: #24292f;
+		cursor: pointer;
+	}
+
+	:global(.inline-comment-form .btn-cancel:hover) {
+		background: #f3f4f6;
+	}
+
+	:global(.inline-comment-form .btn-submit) {
+		padding: 5px 12px;
+		font-size: 12px;
+		font-weight: 600;
+		border: 1px solid transparent;
+		border-radius: 6px;
+		background: #2da44e;
+		color: white;
+		cursor: pointer;
+	}
+
+	:global(.inline-comment-form .btn-submit:hover:not(:disabled)) {
+		background: #2c974b;
+	}
+
+	:global(.inline-comment-form .btn-submit:disabled) {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	/* Inline comment thread styles */
+	:global(.inline-comment-thread-row) {
+		animation: slideDown 0.2s ease-out;
+	}
+
+	:global(.inline-comment-thread-cell) {
+		padding: 8px 12px !important;
+		background: #f6f8fa !important;
+	}
+
+	:global(.inline-thread-container) {
+		background: white;
+		border: 1px solid #d0d7de;
+		border-radius: 6px;
+		overflow: hidden;
+		max-width: 600px;
+	}
+
+	:global(.inline-thread-header) {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 8px 12px;
+		background: #f6f8fa;
+		border-bottom: 1px solid #d0d7de;
+		font-size: 12px;
+		font-weight: 600;
+		color: #24292f;
+	}
+
+	:global(.inline-thread-header .thread-icon) {
+		width: 16px;
+		height: 16px;
+		color: #57606a;
+	}
+
+	:global(.inline-thread-comments) {
+		padding: 0;
+	}
+
+	:global(.inline-thread-comment) {
+		padding: 12px;
+		border-bottom: 1px solid #d0d7de;
+	}
+
+	:global(.inline-thread-comment:last-child) {
+		border-bottom: none;
+	}
+
+	:global(.inline-thread-comment .comment-status) {
+		font-size: 10px;
+		font-weight: 600;
+		text-transform: uppercase;
+		padding: 2px 6px;
+		border-radius: 3px;
+		margin-bottom: 6px;
+		display: inline-block;
+	}
+
+	:global(.inline-thread-comment .status-draft) {
+		background: #fff8c5;
+		color: #9a6700;
+	}
+
+	:global(.inline-thread-comment .status-published) {
+		background: #dafbe1;
+		color: #116329;
+	}
+
+	:global(.inline-thread-comment .comment-body) {
+		font-size: 13px;
+		color: #24292f;
+		line-height: 1.5;
+		white-space: pre-wrap;
+		margin-top: 6px;
+	}
+
+	@keyframes slideDown {
+		from {
+			opacity: 0;
+			transform: translateY(-8px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 
 	/* Fix table borders in diff */
@@ -1492,6 +2267,121 @@
 		:global(.chat-input-container) {
 			box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.2);
 		}
+
+		/* Inline comment dark mode */
+		:global(.inline-comment-trigger:hover) {
+			background-color: #388bfd26 !important;
+		}
+
+		:global(.inline-comment-trigger:hover::before) {
+			color: #58a6ff;
+			background: #388bfd26;
+		}
+
+		:global(.inline-comment-trigger.has-comments) {
+			background-color: #bb800926 !important;
+		}
+
+		:global(.comment-count-badge) {
+			background: #9e6a00;
+		}
+
+		:global(.inline-comment-form-cell),
+		:global(.inline-comment-thread-cell) {
+			background: #21262d !important;
+		}
+
+		:global(.inline-comment-form) {
+			background: #161b22;
+			border-color: #30363d;
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+		}
+
+		:global(.inline-comment-form .form-header) {
+			background: #21262d;
+			border-color: #30363d;
+		}
+
+		:global(.inline-comment-form .location-badge) {
+			color: #8b949e;
+		}
+
+		:global(.inline-comment-form .side-badge) {
+			background: #388bfd26;
+			color: #58a6ff;
+		}
+
+		:global(.inline-comment-form .close-btn) {
+			color: #8b949e;
+		}
+
+		:global(.inline-comment-form .close-btn:hover) {
+			background: #30363d;
+			color: #c9d1d9;
+		}
+
+		:global(.inline-comment-form .comment-textarea) {
+			background: #161b22;
+			color: #c9d1d9;
+		}
+
+		:global(.inline-comment-form .form-footer) {
+			background: #21262d;
+			border-color: #30363d;
+		}
+
+		:global(.inline-comment-form .hint) {
+			color: #6e7681;
+		}
+
+		:global(.inline-comment-form .hint kbd) {
+			background: #21262d;
+			border-color: #30363d;
+			color: #8b949e;
+		}
+
+		:global(.inline-comment-form .btn-cancel) {
+			background: #21262d;
+			border-color: #30363d;
+			color: #c9d1d9;
+		}
+
+		:global(.inline-comment-form .btn-cancel:hover) {
+			background: #30363d;
+		}
+
+		:global(.inline-thread-container) {
+			background: #161b22;
+			border-color: #30363d;
+		}
+
+		:global(.inline-thread-header) {
+			background: #21262d;
+			border-color: #30363d;
+			color: #c9d1d9;
+		}
+
+		:global(.inline-thread-header .thread-icon) {
+			color: #8b949e;
+		}
+
+		:global(.inline-thread-comment) {
+			border-color: #30363d;
+		}
+
+		:global(.inline-thread-comment .status-draft) {
+			background: #bb800926;
+			color: #e3b341;
+		}
+
+		:global(.inline-thread-comment .status-published) {
+			background: #2ea04326;
+			color: #3fb950;
+		}
+
+		:global(.inline-thread-comment .comment-body) {
+			color: #c9d1d9;
+		}
 	}
 
 	/* Also support class-based dark mode for the browser tool and robust theme switching */
@@ -1661,6 +2551,121 @@
 	}
 	:global(.dark) :global(.chat-input-container) {
 		box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.2);
+	}
+
+	/* Inline comment class-based dark mode */
+	:global(.dark) :global(.inline-comment-trigger:hover) {
+		background-color: #388bfd26 !important;
+	}
+
+	:global(.dark) :global(.inline-comment-trigger:hover::before) {
+		color: #58a6ff;
+		background: #388bfd26;
+	}
+
+	:global(.dark) :global(.inline-comment-trigger.has-comments) {
+		background-color: #bb800926 !important;
+	}
+
+	:global(.dark) :global(.comment-count-badge) {
+		background: #9e6a00;
+	}
+
+	:global(.dark) :global(.inline-comment-form-cell),
+	:global(.dark) :global(.inline-comment-thread-cell) {
+		background: #21262d !important;
+	}
+
+	:global(.dark) :global(.inline-comment-form) {
+		background: #161b22;
+		border-color: #30363d;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+	}
+
+	:global(.dark) :global(.inline-comment-form .form-header) {
+		background: #21262d;
+		border-color: #30363d;
+	}
+
+	:global(.dark) :global(.inline-comment-form .location-badge) {
+		color: #8b949e;
+	}
+
+	:global(.dark) :global(.inline-comment-form .side-badge) {
+		background: #388bfd26;
+		color: #58a6ff;
+	}
+
+	:global(.dark) :global(.inline-comment-form .close-btn) {
+		color: #8b949e;
+	}
+
+	:global(.dark) :global(.inline-comment-form .close-btn:hover) {
+		background: #30363d;
+		color: #c9d1d9;
+	}
+
+	:global(.dark) :global(.inline-comment-form .comment-textarea) {
+		background: #161b22;
+		color: #c9d1d9;
+	}
+
+	:global(.dark) :global(.inline-comment-form .form-footer) {
+		background: #21262d;
+		border-color: #30363d;
+	}
+
+	:global(.dark) :global(.inline-comment-form .hint) {
+		color: #6e7681;
+	}
+
+	:global(.dark) :global(.inline-comment-form .hint kbd) {
+		background: #21262d;
+		border-color: #30363d;
+		color: #8b949e;
+	}
+
+	:global(.dark) :global(.inline-comment-form .btn-cancel) {
+		background: #21262d;
+		border-color: #30363d;
+		color: #c9d1d9;
+	}
+
+	:global(.dark) :global(.inline-comment-form .btn-cancel:hover) {
+		background: #30363d;
+	}
+
+	:global(.dark) :global(.inline-thread-container) {
+		background: #161b22;
+		border-color: #30363d;
+	}
+
+	:global(.dark) :global(.inline-thread-header) {
+		background: #21262d;
+		border-color: #30363d;
+		color: #c9d1d9;
+	}
+
+	:global(.dark) :global(.inline-thread-header .thread-icon) {
+		color: #8b949e;
+	}
+
+	:global(.dark) :global(.inline-thread-comment) {
+		border-color: #30363d;
+	}
+
+	:global(.dark) :global(.inline-thread-comment .status-draft) {
+		background: #bb800926;
+		color: #e3b341;
+	}
+
+	:global(.dark) :global(.inline-thread-comment .status-published) {
+		background: #2ea04326;
+		color: #3fb950;
+	}
+
+	:global(.dark) :global(.inline-thread-comment .comment-body) {
+		color: #c9d1d9;
 	}
 </style>
 

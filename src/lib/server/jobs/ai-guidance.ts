@@ -93,10 +93,16 @@ export async function generateAiGuidanceJob(sessionId: string) {
 						{
 							"summary": "A concise summary of what this step involves.",
 							"risks": [
-								{ "description": "Specific risk or concern", "severity": "low|medium|high" }
+								{
+									"description": "Specific risk or concern",
+									"severity": "low|medium|high",
+									"lines": [{ "path": "path/to/file.ts", "startLine": 10, "endLine": 15 }]
+								}
 							],
 							"reviewQuestions": ["list", "of", "questions", "the", "reviewer", "should", "answer"]
-						}`
+						}
+						
+						For each risk, the "lines" array should reference the specific lines in the diff that are relevant to that risk. Use the file paths and line numbers from the diff hunks (the +N line numbers from @@ headers). Each entry needs "path" (the file path), "startLine" and "endLine" (the line range in the new file). If a risk is general and not tied to specific lines, use an empty array for "lines".`
 					},
 					{
 						role: 'user',

@@ -14,6 +14,16 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		throw error(400, 'Missing required fields');
 	}
 
+	// Validate inline comment fields
+	if (targetType === 'inline') {
+		if (!path || !line || !side) {
+			throw error(400, 'Inline comments require path, line, and side');
+		}
+		if (side !== 'LEFT' && side !== 'RIGHT') {
+			throw error(400, 'Side must be LEFT or RIGHT');
+		}
+	}
+
 	const draftId = uuidv4();
 	const draft = {
 		id: draftId,
