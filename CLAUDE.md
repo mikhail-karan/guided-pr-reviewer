@@ -105,3 +105,26 @@ Required in `.env`:
 - `DATABASE_URL` (SQLite path)
 - `REDIS_URL`
 - `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`
+
+## Git Conventions
+
+### Commit Messages
+Use conventional commits format:
+```
+<type>: <description>
+```
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
+
+Examples:
+- `feat: add inline comments on diff view`
+- `fix: resolve auth token refresh issue`
+- `refactor: extract comment form component`
+
+### Branch & PR Naming
+Branch names follow: `<author>/<feature-name>`
+
+Examples:
+- `mike/inline-comments-on-diff`
+- `mike/fix-auth-flow`
+
+PR titles should match the branch name pattern.
