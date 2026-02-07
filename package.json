@@ -19,7 +19,9 @@
 		"db:migrate": "drizzle-kit migrate",
 		"db:studio": "drizzle-kit studio",
 		"worker": "tsx src/worker.ts",
-		"worker:dev": "tsx watch src/worker.ts"
+		"worker:dev": "tsx watch src/worker.ts",
+		"dev:redis": "docker compose up redis",
+		"dev:all": "concurrently -n redis,web,worker -c blue,green,yellow \"pnpm dev:redis\" \"pnpm dev\" \"pnpm worker:dev\""
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.4.0",
@@ -35,6 +37,7 @@
 		"@types/marked": "^6.0.0",
 		"@types/node": "^22",
 		"@types/uuid": "^11.0.0",
+		"concurrently": "^9.2.1",
 		"drizzle-kit": "^0.31.8",
 		"drizzle-orm": "^0.45.0",
 		"eslint": "^9.39.1",
@@ -61,6 +64,7 @@
 		"better-sqlite3": "^12.5.0",
 		"bullmq": "^5.66.1",
 		"diff2html": "^3.4.52",
+		"dotenv": "^17.2.4",
 		"ioredis": "^5.8.2",
 		"marked": "^17.0.1",
 		"openai": "^6.14.0",

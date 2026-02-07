@@ -1,4 +1,6 @@
-// Use process.env directly for the worker, and $env for SvelteKit
+import 'dotenv/config';
+
+// Use process.env directly for both the worker and SvelteKit server
 const getEnv = (key: string, fallback: string = ''): string => {
 	if (typeof process !== 'undefined' && process.env && process.env[key]) {
 		return process.env[key] as string;
