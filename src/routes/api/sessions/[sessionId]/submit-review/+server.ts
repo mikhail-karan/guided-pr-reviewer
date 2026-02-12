@@ -2,7 +2,7 @@ import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
 import * as table from '$lib/server/db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { getAppOctokit } from '$lib/server/auth/github';
 
 export const POST: RequestHandler = async ({ params, request, locals }) => {
@@ -57,9 +57,16 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		(dc) => dc.comment.targetType === 'conversation' && dc.comment.status === 'draft'
 	);
 
-	const inlineComments = inlineDraftComments.map((dc) => ({
+	const validInlineDraftComments = inlineDraftComments.filter(
+		(dc) => dc.comment.path && dc.comment.line != null
+	);
+
+	const inlineComments = validInlineDraftComments.map((dc) => ({
 		path: dc.comment.path!,
-		position: dc.comment.line!, // position in diff (using line number as approximation)
+		line: dc.comment.line!,
+		side: (dc.comment.side as 'LEFT' | 'RIGHT' | null) ?? undefined,
+		start_line: dc.comment.startLine ?? undefined,
+		start_side: (dc.comment.startSide as 'LEFT' | 'RIGHT' | null) ?? undefined,
 		body: dc.comment.bodyMarkdown
 	}));
 
@@ -76,6 +83,11 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		finalReviewBody = conversationDraftComments
 			.map((dc) => dc.comment.bodyMarkdown)
 			.join('\n\n---\n\n');
+	}
+	if (!finalReviewBody && hasInlineComments) {
+		// GitHub may treat approve-with-inline payloads as COMMENTED.
+		// Ensure we always submit an explicit review body for the selected event.
+		finalReviewBody = event === 'APPROVE' ? 'Approved. See inline comments.' : 'See inline comments.';
 	}
 
 	// Final check: GitHub still requires either a body or inline comments
@@ -96,11 +108,6 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 			event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
 			body?: string;
 			commit_id: string;
-			comments?: Array<{
-				path: string;
-				position: number;
-				body: string;
-			}>;
 		} = {
 			owner: session.repo.owner,
 			repo: session.repo.name,
@@ -112,11 +119,6 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		// Include body if provided or generated
 		if (finalReviewBody) {
 			reviewParams.body = finalReviewBody;
-		}
-
-		// Include inline comments if any
-		if (hasInlineComments) {
-			reviewParams.comments = inlineComments;
 		}
 
 		await octokit.pulls.createReview(reviewParams);
@@ -157,16 +159,49 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 			}
 		}
 
-		// Mark inline draft comments as published (they were included in the review)
+		// Publish inline draft comments after review submission to preserve APPROVE/REQUEST_CHANGES state.
 		if (hasInlineComments) {
-			const inlineCommentIds = inlineDraftComments.map((dc) => dc.comment.id);
-			await db
-				.update(table.draftComments)
-				.set({
-					status: 'published',
-					updatedAt: new Date()
-				})
-				.where(inArray(table.draftComments.id, inlineCommentIds));
+			for (const draftComment of validInlineDraftComments) {
+				try {
+					await db
+						.update(table.draftComments)
+						.set({ status: 'publishing' })
+						.where(eq(table.draftComments.id, draftComment.comment.id));
+
+					const inlineResponse = await octokit.pulls.createReviewComment({
+						owner: session.repo.owner,
+						repo: session.repo.name,
+						pull_number: session.pr.number,
+						body: draftComment.comment.bodyMarkdown,
+						commit_id: session.pr.headSha,
+						path: draftComment.comment.path!,
+						line: draftComment.comment.line!,
+						side: (draftComment.comment.side as 'LEFT' | 'RIGHT' | undefined) ?? undefined,
+						start_line: draftComment.comment.startLine ?? undefined,
+						start_side:
+							(draftComment.comment.startSide as 'LEFT' | 'RIGHT' | undefined) ?? undefined
+					});
+
+					await db
+						.update(table.draftComments)
+						.set({
+							status: 'published',
+							githubCommentId: inlineResponse.data.id.toString(),
+							updatedAt: new Date()
+						})
+						.where(eq(table.draftComments.id, draftComment.comment.id));
+				} catch (err: any) {
+					console.error(`Failed to publish inline comment ${draftComment.comment.id}:`, err);
+					await db
+						.update(table.draftComments)
+						.set({
+							status: 'failed',
+							errorMessage: err.message,
+							updatedAt: new Date()
+						})
+						.where(eq(table.draftComments.id, draftComment.comment.id));
+				}
+			}
 		}
 
 		// Mark session as completed

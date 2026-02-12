@@ -4,6 +4,35 @@ import { eq, asc } from 'drizzle-orm';
 import { ai, LLM_MODEL } from '../ai/client';
 import { safeParse } from '../../utils';
 
+/**
+ * Build a formatted codebase context section for inclusion in AI prompts.
+ * Returns an empty string if no context is available.
+ */
+function buildCodebaseContextPrompt(codebaseContextJson: string | null): string {
+	if (!codebaseContextJson) return '';
+
+	try {
+		const ctx = JSON.parse(codebaseContextJson);
+		const sections: string[] = ['## Codebase Context'];
+
+		if (ctx.description) sections.push(`- **Project**: ${ctx.description}`);
+		if (ctx.techStack?.length) sections.push(`- **Tech Stack**: ${ctx.techStack.join(', ')}`);
+		if (ctx.architecture) sections.push(`- **Architecture**: ${ctx.architecture}`);
+		if (ctx.conventions) sections.push(`- **Conventions**: ${ctx.conventions}`);
+		if (ctx.testingApproach) sections.push(`- **Testing**: ${ctx.testingApproach}`);
+
+		if (sections.length <= 1) return ''; // No meaningful content
+
+		sections.push(
+			'\nUse this codebase context to provide more specific, project-aware review guidance. Reference project conventions and patterns when relevant.'
+		);
+
+		return '\n\n' + sections.join('\n');
+	} catch {
+		return '';
+	}
+}
+
 export async function generateAiGuidanceJob(sessionId: string) {
 	console.log(`Generating AI guidance for session ${sessionId}`);
 
@@ -11,13 +40,17 @@ export async function generateAiGuidanceJob(sessionId: string) {
 		.select({
 			session: table.reviewSessions,
 			pr: table.pullRequests,
+			repo: table.repos,
 		})
 		.from(table.reviewSessions)
 		.innerJoin(table.pullRequests, eq(table.reviewSessions.pullRequestId, table.pullRequests.id))
+		.innerJoin(table.repos, eq(table.pullRequests.repoId, table.repos.id))
 		.where(eq(table.reviewSessions.id, sessionId))
 		.get();
 
 	if (!session) return;
+
+	const codebaseContext = buildCodebaseContextPrompt(session.repo.codebaseContextJson);
 
 	const steps = await db
 		.select()
@@ -41,7 +74,7 @@ export async function generateAiGuidanceJob(sessionId: string) {
 					{
 						"overview": "A brief 2-3 sentence overview of the PR goals.",
 						"keyChanges": ["list", "of", "important", "changes"]
-					}`
+					}${codebaseContext}`
 				},
 				{
 					role: 'user',
@@ -102,7 +135,7 @@ export async function generateAiGuidanceJob(sessionId: string) {
 							"reviewQuestions": ["list", "of", "questions", "the", "reviewer", "should", "answer"]
 						}
 						
-						For each risk, the "lines" array should reference the specific lines in the diff that are relevant to that risk. Use the file paths and line numbers from the diff hunks (the +N line numbers from @@ headers). Each entry needs "path" (the file path), "startLine" and "endLine" (the line range in the new file). If a risk is general and not tied to specific lines, use an empty array for "lines".`
+						For each risk, the "lines" array should reference the specific lines in the diff that are relevant to that risk. Use the file paths and line numbers from the diff hunks (the +N line numbers from @@ headers). Each entry needs "path" (the file path), "startLine" and "endLine" (the line range in the new file). If a risk is general and not tied to specific lines, use an empty array for "lines".${codebaseContext}`
 					},
 					{
 						role: 'user',
@@ -165,7 +198,7 @@ export async function generateAiGuidanceJob(sessionId: string) {
 								messages: [
 									{
 										role: 'system',
-										content: `You are an expert code reviewer. Provide a brief, clear explanation (1-3 sentences) of what this code diff hunk accomplishes. Focus on the "what" and "why" - explain the purpose and intent of the changes, not a line-by-line description. Be concise and helpful for code reviewers.`
+										content: `You are an expert code reviewer. Provide a brief, clear explanation (1-3 sentences) of what this code diff hunk accomplishes. Focus on the "what" and "why" - explain the purpose and intent of the changes, not a line-by-line description. Be concise and helpful for code reviewers.${codebaseContext}`
 									},
 									{
 										role: 'user',
@@ -197,7 +230,7 @@ export async function generateAiGuidanceJob(sessionId: string) {
 									messages: [
 										{
 											role: 'system',
-											content: `You are an expert code reviewer. Provide a brief, clear explanation (1-3 sentences) of what this code diff hunk accomplishes. Focus on the "what" and "why" - explain the purpose and intent of the changes, not a line-by-line description. Be concise and helpful for code reviewers.`
+											content: `You are an expert code reviewer. Provide a brief, clear explanation (1-3 sentences) of what this code diff hunk accomplishes. Focus on the "what" and "why" - explain the purpose and intent of the changes, not a line-by-line description. Be concise and helpful for code reviewers.${codebaseContext}`
 										},
 										{
 											role: 'user',

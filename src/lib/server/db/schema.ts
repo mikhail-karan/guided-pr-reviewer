@@ -81,6 +81,7 @@ export const repos = sqliteTable('repos', {
 	owner: text('owner').notNull(),
 	name: text('name').notNull(),
 	defaultBranch: text('default_branch').notNull(),
+	codebaseContextJson: text('codebase_context_json'), // JSON: repo-level codebase context for AI reviews
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()
 		.default(sql`(unixepoch())`),

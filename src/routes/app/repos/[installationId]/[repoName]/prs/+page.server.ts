@@ -94,10 +94,14 @@ export const actions: Actions = {
 				owner,
 				name: repoName,
 				defaultBranch: repoData.default_branch,
+				codebaseContextJson: null,
 				createdAt: new Date(),
 				updatedAt: new Date()
 			};
 			await db.insert(table.repos).values(repo);
+
+			// Gather codebase context in the background for better AI reviews
+			await addJob('gather_repo_context', { repoId: repo.id });
 		}
 
 		// 2. Fetch PR info from GitHub

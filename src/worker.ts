@@ -4,6 +4,7 @@ import { ingestPrJob } from './lib/server/jobs/ingest-pr';
 import { generateStepsJob } from './lib/server/jobs/generate-steps';
 import { buildContextPackJob } from './lib/server/jobs/build-context';
 import { generateAiGuidanceJob } from './lib/server/jobs/ai-guidance';
+import { gatherRepoContextJob } from './lib/server/jobs/gather-repo-context';
 
 const worker = new Worker(
 	'review-tasks',
@@ -21,10 +22,13 @@ const worker = new Worker(
 				case 'build_context_pack':
 					await buildContextPackJob(job.data.stepId);
 					break;
-				case 'generate_ai_guidance':
-					await generateAiGuidanceJob(job.data.sessionId);
-					break;
-				default:
+			case 'generate_ai_guidance':
+				await generateAiGuidanceJob(job.data.sessionId);
+				break;
+			case 'gather_repo_context':
+				await gatherRepoContextJob(job.data.repoId);
+				break;
+			default:
 					console.warn(`Unknown job type: ${job.name}`);
 			}
 		} catch (error) {

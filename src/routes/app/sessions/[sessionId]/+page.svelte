@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
+	import { onMount, onDestroy } from 'svelte';
 	import { safeParse } from '$lib/utils';
 	import type { PageData } from './$types';
 
@@ -8,6 +10,55 @@
 	let showConfigMenu = $state(false);
 	let isRegenerating = $state(false);
 	let regenerateMessage = $state<string | null>(null);
+
+	// -- Polling for step generation --
+	let pollInterval = $state<ReturnType<typeof setInterval> | null>(null);
+	let pollTimeoutId = $state<ReturnType<typeof setTimeout> | null>(null);
+	let pollTimedOut = $state(false);
+
+	function startPolling() {
+		if (pollInterval) return;
+		pollTimedOut = false;
+
+		pollTimeoutId = setTimeout(() => {
+			stopPolling();
+			pollTimedOut = true;
+		}, 120_000); // 2 minutes
+
+		pollInterval = setInterval(async () => {
+			try {
+				const res = await fetch(`/api/sessions/${data.session.id}/status`);
+				const { stepCount } = await res.json();
+				if (stepCount > 0) {
+					stopPolling();
+					invalidateAll();
+				}
+			} catch {
+				// Silently retry on network errors
+			}
+		}, 3000);
+	}
+
+	function stopPolling() {
+		if (pollInterval) {
+			clearInterval(pollInterval);
+			pollInterval = null;
+		}
+		if (pollTimeoutId) {
+			clearTimeout(pollTimeoutId);
+			pollTimeoutId = null;
+		}
+	}
+
+	onMount(() => {
+		if (data.steps.length === 0) {
+			startPolling();
+		}
+	});
+
+	onDestroy(() => {
+		stopPolling();
+	});
 
 	type SortOption = 'default' | 'impact' | 'complexity';
 	let sortBy = $state<SortOption>('impact');
@@ -183,13 +234,29 @@
 					</div>
 				</div>
 
-				{#if data.steps.length === 0}
-					<div class="bg-white dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-12 text-center">
+			{#if data.steps.length === 0}
+				<div class="bg-white dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-12 text-center">
+					{#if pollTimedOut}
+						<div class="flex flex-col items-center">
+							<svg class="w-10 h-10 text-amber-400 dark:text-amber-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+							</svg>
+							<p class="text-gray-700 dark:text-gray-300 font-medium mb-2">Step generation is taking longer than expected.</p>
+							<p class="text-sm text-gray-500 dark:text-gray-400 mb-4">There may have been an issue processing this PR. You can try waiting a bit longer.</p>
+							<button
+								onclick={() => startPolling()}
+								class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors"
+							>
+								Retry
+							</button>
+						</div>
+					{:else}
 						<div class="animate-pulse flex flex-col items-center">
 							<div class="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
 							<p class="text-gray-500 dark:text-gray-400">Generating review steps... this may take a minute.</p>
 						</div>
-					</div>
+					{/if}
+				</div>
 				{:else}
 					<div class="space-y-4">
 						{#each sortedSteps as step}
