@@ -10,5 +10,3 @@ export const POST: RequestHandler = async (event) => {
 
 	throw redirect(302, '/');
 };
-
-

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="logoTitle logoDesc">
+  <title id="logoTitle">Guided PR Reviewer Logo</title>
+  <desc id="logoDesc">Speech bubble with branch line and check mark.</desc>
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#0B234F" />
+    </linearGradient>
+    <linearGradient id="lineGradient" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#60A5FA" />
+      <stop offset="100%" stop-color="#2563EB" />
+    </linearGradient>
+  </defs>
+
+  <path
+    d="M24 16h72c8.8 0 16 7.2 16 16v48c0 8.8-7.2 16-16 16H56l-18 16v-16H24c-8.8 0-16-7.2-16-16V32c0-8.8 7.2-16 16-16z"
+    fill="url(#bgGradient)"
+  />
+
+  <path
+    d="M30 64c0-8.8 7.2-16 16-16h10c5 0 9 4 9 9s4 9 9 9h10"
+    fill="none"
+    stroke="url(#lineGradient)"
+    stroke-width="8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <circle cx="46" cy="48" r="6" fill="#60A5FA" />
+
+  <path
+    d="M65 54l10 10 23-30"
+    fill="none"
+    stroke="#3B82F6"
+    stroke-width="10"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M67 52l6 6 12-15"
+    fill="none"
+    stroke="#34D399"
+    stroke-width="4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

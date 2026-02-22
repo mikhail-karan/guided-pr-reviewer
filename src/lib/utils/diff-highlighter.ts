@@ -19,10 +19,10 @@ export async function highlightDiffCodeLines(
 	if (typeof document === 'undefined') return; // Skip in SSR
 
 	const language = detectLanguage(filePath);
-	
+
 	// Find all code line containers - diff2html uses .d2h-code-line-ctn for the actual code content
 	const codeLineContainers = container.querySelectorAll('.d2h-code-line-ctn');
-	
+
 	if (codeLineContainers.length === 0) {
 		// Fallback: try finding code lines directly
 		const codeLines = container.querySelectorAll('.d2h-code-line');
@@ -33,10 +33,10 @@ export async function highlightDiffCodeLines(
 	// Process lines in batches to avoid blocking the UI
 	const batchSize = 20;
 	const containersArray = Array.from(codeLineContainers);
-	
+
 	for (let i = 0; i < containersArray.length; i += batchSize) {
 		const batch = containersArray.slice(i, i + batchSize);
-		
+
 		await Promise.all(
 			batch.map(async (codeCell) => {
 				const codeText = codeCell.textContent || '';
@@ -46,7 +46,7 @@ export async function highlightDiffCodeLines(
 					// Highlight the code
 					const highlighted = await codeToHtml(codeText, {
 						lang: language,
-						theme: theme,
+						theme: theme
 					});
 
 					// Extract the code content from Shiki's output
@@ -58,20 +58,20 @@ export async function highlightDiffCodeLines(
 					// Get the inner HTML with syntax highlighting tokens
 					// Shiki wraps content in <span class="line">, we want to preserve that structure
 					let highlightedContent = codeElement.innerHTML;
-					
+
 					// If Shiki wrapped in a <span class="line">, extract just the inner spans
 					const lineSpan = codeElement.querySelector('span.line');
 					if (lineSpan) {
 						highlightedContent = lineSpan.innerHTML;
 					}
-					
+
 					// Replace the code cell content with highlighted version
 					// Preserve any existing classes or attributes
 					codeCell.innerHTML = highlightedContent;
-					
+
 					// Add shiki class for styling
 					codeCell.classList.add('shiki-highlighted');
-					
+
 					// Copy styles from Shiki's pre element to maintain colors
 					const preElement = tempDiv.querySelector('pre');
 					if (preElement) {
@@ -100,10 +100,10 @@ async function highlightCodeLinesDirect(
 ): Promise<void> {
 	const batchSize = 20;
 	const linesArray = Array.from(codeLines);
-	
+
 	for (let i = 0; i < linesArray.length; i += batchSize) {
 		const batch = linesArray.slice(i, i + batchSize);
-		
+
 		await Promise.all(
 			batch.map(async (lineElement) => {
 				const codeText = lineElement.textContent || '';
@@ -112,7 +112,7 @@ async function highlightCodeLinesDirect(
 				try {
 					const highlighted = await codeToHtml(codeText, {
 						lang: language,
-						theme: theme,
+						theme: theme
 					});
 
 					const tempDiv = document.createElement('div');
@@ -150,17 +150,17 @@ export async function highlightDiffContainer(
 
 	// Group code lines by file path
 	const fileDiffs = container.querySelectorAll('.d2h-file-wrapper');
-	
+
 	for (const fileDiff of Array.from(fileDiffs)) {
 		// Find the file path from the diff header or use the first hunk's path
 		const fileHeader = fileDiff.querySelector('.d2h-file-name');
 		const filePath = fileHeader?.textContent?.trim() || hunks[0]?.path || '';
-		
+
 		if (!filePath) continue;
 
 		// Extract actual file path (remove "a/" or "b/" prefix if present)
 		const cleanPath = filePath.replace(/^[ab]\//, '').trim();
-		
+
 		await highlightDiffCodeLines(fileDiff as HTMLElement, cleanPath, theme);
 	}
 }

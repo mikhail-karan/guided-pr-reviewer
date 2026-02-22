@@ -8,7 +8,7 @@ import { getShikiTheme } from './shiki-theme';
  */
 marked.setOptions({
 	breaks: true,
-	gfm: true,
+	gfm: true
 });
 
 // Store original code renderer
@@ -41,7 +41,7 @@ marked.Renderer.prototype.code = function (code: string, language?: string) {
 	// Generate a unique ID for this code block
 	const id = `code-block-${Math.random().toString(36).substr(2, 9)}`;
 	const lang = language || 'text';
-	
+
 	// Return a placeholder div that will be replaced with highlighted code
 	// We use base64 encoding to safely store code in data attribute
 	let encodedCode: string;
@@ -57,7 +57,7 @@ marked.Renderer.prototype.code = function (code: string, language?: string) {
 		// Node.js environment (SSR)
 		encodedCode = Buffer.from(code, 'utf-8').toString('base64');
 	}
-	
+
 	return `<div class="shiki-placeholder" data-shiki-id="${id}" data-shiki-lang="${lang}" data-shiki-code="${encodedCode}"></div>`;
 };
 
@@ -66,29 +66,31 @@ marked.Renderer.prototype.code = function (code: string, language?: string) {
  * This should be called after rendering markdown, ideally in an effect or onMount
  * Only works in browser environment
  */
-export async function highlightCodeBlocks(container: HTMLElement | string, theme?: string): Promise<void> {
+export async function highlightCodeBlocks(
+	container: HTMLElement | string,
+	theme?: string
+): Promise<void> {
 	if (!theme) {
 		theme = getShikiTheme();
 	}
 	if (typeof document === 'undefined') return; // Skip in SSR
-	
-	const element = typeof container === 'string' 
-		? document.querySelector(container) as HTMLElement
-		: container;
-	
+
+	const element =
+		typeof container === 'string' ? (document.querySelector(container) as HTMLElement) : container;
+
 	if (!element) {
 		return;
 	}
 
 	const placeholders = element.querySelectorAll('.shiki-placeholder');
-	
+
 	for (const placeholder of Array.from(placeholders)) {
 		const htmlElement = placeholder as HTMLElement;
 		const encodedCode = htmlElement.getAttribute('data-shiki-code');
 		const lang = htmlElement.getAttribute('data-shiki-lang') || 'text';
-		
+
 		if (!encodedCode) continue;
-		
+
 		try {
 			// Decode base64 (matching the encoding: btoa(unescape(encodeURIComponent(code))))
 			let code: string;
@@ -102,12 +104,12 @@ export async function highlightCodeBlocks(container: HTMLElement | string, theme
 			} else {
 				code = Buffer.from(encodedCode, 'base64').toString('utf-8');
 			}
-			
+
 			const highlighted = await codeToHtml(code, {
 				lang: lang,
-				theme: theme,
+				theme: theme
 			});
-			
+
 			// Replace placeholder with highlighted code
 			htmlElement.outerHTML = highlighted;
 		} catch (err) {

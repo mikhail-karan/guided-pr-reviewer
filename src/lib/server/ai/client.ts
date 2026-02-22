@@ -11,4 +11,3 @@ export const ai = new OpenAI({
 });
 
 export const LLM_MODEL = ENV.LLM_MODEL;
-

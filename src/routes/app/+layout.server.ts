@@ -12,5 +12,3 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		githubAppName: ENV.GITHUB_APP_NAME
 	};
 };
-
-

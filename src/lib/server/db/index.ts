@@ -15,6 +15,5 @@ export const db = {
 	select: (...args: any[]) => db.instance.select(...args),
 	insert: (...args: any[]) => db.instance.insert(...args),
 	update: (...args: any[]) => db.instance.update(...args),
-	delete: (...args: any[]) => db.instance.delete(...args),
+	delete: (...args: any[]) => db.instance.delete(...args)
 } as unknown as ReturnType<typeof drizzle<typeof schema>>;
-

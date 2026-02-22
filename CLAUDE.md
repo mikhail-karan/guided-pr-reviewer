@@ -43,11 +43,14 @@ pnpm test:e2e
 ## Architecture
 
 ### Two-Process Architecture
+
 The app runs as two separate processes:
+
 1. **Web Server** (`pnpm dev`) - SvelteKit app handling HTTP requests, auth, and UI
 2. **Background Worker** (`pnpm worker:dev` or `src/worker.ts`) - BullMQ worker processing async jobs
 
 ### Tech Stack
+
 - **Frontend**: SvelteKit 2, Svelte 5, TailwindCSS 4
 - **Database**: SQLite via Drizzle ORM (`src/lib/server/db/schema.ts`)
 - **Queue**: BullMQ with Redis for background jobs
@@ -78,28 +81,35 @@ src/
 ```
 
 ### Data Model
+
 The core entities flow: `User` → `Team` → `GithubInstallation` → `Repo` → `PullRequest` → `ReviewSession` → `ReviewStep`
 
 Each `ReviewStep` can have:
+
 - `ContextPack`: Related code context for the step
 - `ReviewerNote`: User notes with severity levels
 - `DraftComment`: Comments to publish to GitHub
 - `StepChatMessage`: Chat history for step-specific AI conversation
 
 ### Background Jobs (`src/lib/server/jobs/`)
+
 Jobs are processed by the worker via BullMQ queue `review-tasks`:
+
 - `ingest_pr` - Fetches PR diff and file metadata from GitHub
 - `generate_steps` - Clusters changes into logical review steps using AI
 - `build_context_pack` - Gathers context for each step
 - `generate_ai_guidance` - Generates AI guidance for steps
 
 ### Authentication
+
 - GitHub App OAuth for user login
 - Session-based auth with cookies (`src/lib/server/auth/session.ts`)
 - App.Locals populated via server hooks (`src/hooks.server.ts`)
 
 ### Environment Variables
+
 Required in `.env`:
+
 - `GITHUB_APP_ID`, `GITHUB_APP_NAME`, `GITHUB_APP_PRIVATE_KEY`
 - `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_WEBHOOK_SECRET`
 - `DATABASE_URL` (SQLite path)
@@ -109,21 +119,27 @@ Required in `.env`:
 ## Git Conventions
 
 ### Commit Messages
+
 Use conventional commits format:
+
 ```
 <type>: <description>
 ```
+
 Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
 Examples:
+
 - `feat: add inline comments on diff view`
 - `fix: resolve auth token refresh issue`
 - `refactor: extract comment form component`
 
 ### Branch & PR Naming
+
 Branch names follow: `<author>/<feature-name>`
 
 Examples:
+
 - `mike/inline-comments-on-diff`
 - `mike/fix-auth-flow`
 

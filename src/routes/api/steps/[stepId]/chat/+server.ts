@@ -7,6 +7,51 @@ import { ai, LLM_MODEL } from '$lib/server/ai/client';
 import { v4 as uuidv4 } from 'uuid';
 import { safeParse } from '$lib/utils';
 
+function extractDeltaText(deltaContent: unknown): string {
+	if (typeof deltaContent === 'string') return deltaContent;
+
+	if (Array.isArray(deltaContent)) {
+		return deltaContent
+			.map((part) => {
+				if (typeof part === 'string') return part;
+				if (!part || typeof part !== 'object') return '';
+
+				const typedPart = part as Record<string, unknown>;
+				if (typeof typedPart.text === 'string') return typedPart.text;
+
+				const nestedText = typedPart.text;
+				if (nestedText && typeof nestedText === 'object') {
+					const nested = nestedText as Record<string, unknown>;
+					if (typeof nested.value === 'string') return nested.value;
+				}
+
+				if (typeof typedPart.content === 'string') return typedPart.content;
+				return '';
+			})
+			.join('');
+	}
+
+	if (deltaContent && typeof deltaContent === 'object') {
+		const obj = deltaContent as Record<string, unknown>;
+		if (typeof obj.text === 'string') return obj.text;
+		if (typeof obj.content === 'string') return obj.content;
+	}
+
+	return '';
+}
+
+function toPromptText(value: unknown): string {
+	if (value === null || value === undefined) return '';
+	if (typeof value === 'string') return value;
+	if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+	try {
+		return JSON.stringify(value, null, 2);
+	} catch {
+		return String(value);
+	}
+}
+
 export const POST: RequestHandler = async ({ params, request, locals }) => {
 	if (!locals.user) throw error(401, 'Unauthorized');
 
@@ -61,7 +106,9 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 
 	// Build context from step data
 	const diffHunks = safeParse<any[]>(step.diffHunksJson, []);
-	const diffText = diffHunks.map((h) => `File: ${h.path}\n${h.patch}`).join('\n\n');
+	const diffText = diffHunks
+		.map((h) => `File: ${toPromptText(h.path)}\n${toPromptText(h.patch)}`)
+		.join('\n\n');
 
 	const aiGuidance = safeParse<{ summary: string; risks: any[]; reviewQuestions: string[] }>(
 		step.aiGuidanceJson,
@@ -78,7 +125,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	if (contextPack) {
 		const items = safeParse<any[]>(contextPack.itemsJson, []);
 		contextPackText = items
-			.map((item) => `${item.type}: ${item.path}\n${item.snippet}`)
+			.map((item) => `${toPromptText(item.type)}: ${toPromptText(item.path)}\n${toPromptText(item.snippet)}`)
 			.join('\n\n');
 	}
 
@@ -105,11 +152,11 @@ ${diffText}
 `;
 
 	if (aiGuidance?.summary) {
-		userPrompt += `\n\nAI Guidance Summary:\n${aiGuidance.summary}\n`;
+		userPrompt += `\n\nAI Guidance Summary:\n${toPromptText(aiGuidance.summary)}\n`;
 	}
 
 	if (aiGuidance?.risks?.length) {
-		userPrompt += `\n\nPotential Risks:\n${aiGuidance.risks.map((r) => `- ${r.description}`).join('\n')}\n`;
+		userPrompt += `\n\nPotential Risks:\n${aiGuidance.risks.map((r) => `- ${toPromptText(r?.description)}`).join('\n')}\n`;
 	}
 
 	if (contextPackText) {
@@ -122,7 +169,7 @@ ${diffText}
 		.slice(-10)
 		.map((msg) => ({
 			role: msg.role as 'user' | 'assistant',
-			content: msg.content
+			content: toPromptText(msg.content)
 		}));
 
 	userPrompt += `\n\nUser's question: ${message.trim()}`;
@@ -146,7 +193,7 @@ ${diffText}
 				});
 
 				for await (const chunk of stream) {
-					const content = chunk.choices[0]?.delta?.content || '';
+					const content = extractDeltaText(chunk.choices[0]?.delta?.content);
 					if (content) {
 						fullResponse += content;
 						controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
@@ -165,13 +212,28 @@ ${diffText}
 						createdAt: new Date()
 					});
 				}
-
 				controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`));
 				controller.close();
 			} catch (err: any) {
 				console.error('Error streaming chat response:', err);
+
+				// Preserve partial content if the stream fails mid-response.
+				if (fullResponse.trim()) {
+					const assistantMessageId = uuidv4();
+					await db.insert(table.stepChatMessages).values({
+						id: assistantMessageId,
+						stepId,
+						authorUserId: locals.user.id,
+						role: 'assistant',
+						content: fullResponse,
+						createdAt: new Date()
+					});
+				}
+
 				controller.enqueue(
-					encoder.encode(`data: ${JSON.stringify({ error: err.message || 'Failed to generate response' })}\n\n`)
+					encoder.encode(
+						`data: ${JSON.stringify({ error: err.message || 'Failed to generate response' })}\n\n`
+					)
 				);
 				controller.close();
 			}

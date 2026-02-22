@@ -14,7 +14,9 @@ export const getConnection = () => {
 };
 
 export const reviewQueue = new Queue('review-tasks', {
-	get connection() { return getConnection(); },
+	get connection() {
+		return getConnection();
+	},
 	defaultJobOptions: {
 		attempts: 3,
 		backoff: {
@@ -24,9 +26,14 @@ export const reviewQueue = new Queue('review-tasks', {
 	}
 });
 
-export async function addJob(name: string, data: any) {
-	return await reviewQueue.add(name, data);
+export type AddJobOptions = {
+	jobId?: string;
+};
+
+export async function addJob(name: string, data: any, options?: AddJobOptions) {
+	return await reviewQueue.add(name, data, {
+		...(options?.jobId && { jobId: options.jobId })
+	});
 }
 
 export { connection as redisConnection };
-

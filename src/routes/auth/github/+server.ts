@@ -13,5 +13,3 @@ export const GET: RequestHandler = async () => {
 
 	throw redirect(302, githubAuthUrl.toString());
 };
-
-

@@ -9,7 +9,7 @@ const extensionMap: Record<string, string> = {
 	jsx: 'jsx',
 	mjs: 'javascript',
 	cjs: 'javascript',
-	
+
 	// Web
 	svelte: 'svelte',
 	vue: 'vue',
@@ -18,7 +18,7 @@ const extensionMap: Record<string, string> = {
 	scss: 'scss',
 	sass: 'sass',
 	less: 'less',
-	
+
 	// Backend
 	py: 'python',
 	go: 'go',
@@ -29,17 +29,17 @@ const extensionMap: Record<string, string> = {
 	kt: 'kotlin',
 	scala: 'scala',
 	clj: 'clojure',
-	
+
 	// Data/Config
 	json: 'json',
 	yaml: 'yaml',
 	yml: 'yaml',
 	toml: 'toml',
 	xml: 'xml',
-	
+
 	// Database
 	sql: 'sql',
-	
+
 	// Shell
 	sh: 'bash',
 	bash: 'bash',
@@ -47,18 +47,18 @@ const extensionMap: Record<string, string> = {
 	fish: 'fish',
 	powershell: 'powershell',
 	ps1: 'powershell',
-	
+
 	// Documentation
 	md: 'markdown',
 	mdx: 'mdx',
-	
+
 	// Other
 	dockerfile: 'dockerfile',
 	env: 'properties',
 	properties: 'properties',
 	ini: 'ini',
 	conf: 'ini',
-	txt: 'text',
+	txt: 'text'
 };
 
 /**
@@ -68,18 +68,18 @@ const extensionMap: Record<string, string> = {
  */
 export function detectLanguage(filePath: string): string {
 	if (!filePath) return 'text';
-	
+
 	// Extract extension (handle multiple dots and special cases)
 	const parts = filePath.split('.');
 	if (parts.length < 2) return 'text';
-	
+
 	const extension = parts[parts.length - 1].toLowerCase();
-	
+
 	// Handle special cases
 	if (extension === 'dockerfile' || filePath.toLowerCase().includes('dockerfile')) {
 		return 'dockerfile';
 	}
-	
+
 	// Check extension map
 	return extensionMap[extension] || 'text';
 }

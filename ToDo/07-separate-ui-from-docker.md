@@ -1,15 +1,18 @@
 # Plan: Separate UI from Docker Container
 
 ## Overview
+
 Restructure the deployment architecture so the UI (SvelteKit frontend) runs outside the Docker container but connects to the backend services running in Docker.
 
 ## Current State
+
 - Single `web.Dockerfile` that builds and serves the entire SvelteKit app
 - `docker-compose.yml` runs web, worker, and database services
 - UI and API are tightly coupled in the same container
 - Development requires rebuilding Docker image for UI changes
 
 ## Benefits of Separation
+
 1. **Faster development** - UI hot reload works without Docker rebuilds
 2. **Independent scaling** - Scale API/worker separately from UI serving
 3. **Simpler deployments** - UI can be deployed to CDN/Vercel while API stays in Docker
@@ -28,7 +31,7 @@ services:
       context: .
       dockerfile: docker/api.Dockerfile
     ports:
-      - "3001:3001"
+      - '3001:3001'
     environment:
       - DATABASE_URL=file:/data/pr-reviewer.db
       - NODE_ENV=production
@@ -63,7 +66,7 @@ services:
       context: .
       dockerfile: docker/ui.Dockerfile
     ports:
-      - "3000:3000"
+      - '3000:3000'
     environment:
       - API_URL=http://api:3001
     depends_on:
@@ -71,6 +74,7 @@ services:
 ```
 
 ### 2. Create Separate API Server
+
 Create `src/api-server.ts`:
 
 ```typescript
@@ -81,32 +85,36 @@ import cors from 'cors';
 const app = express();
 
 // Enable CORS for UI running on different origin
-app.use(cors({
-  origin: process.env.UI_ORIGIN || 'http://localhost:5173',
-  credentials: true
-}));
+app.use(
+	cors({
+		origin: process.env.UI_ORIGIN || 'http://localhost:5173',
+		credentials: true
+	})
+);
 
 // Mount SvelteKit handler (API routes only)
 app.use(handler);
 
 app.listen(3001, () => {
-  console.log('API server running on port 3001');
+	console.log('API server running on port 3001');
 });
 ```
 
 ### 3. Update API Routes
+
 Ensure all API routes work independently:
 
 ```typescript
 // src/routes/api/+server.ts
 export async function GET() {
-  return new Response(JSON.stringify({ status: 'ok' }), {
-    headers: { 'Content-Type': 'application/json' }
-  });
+	return new Response(JSON.stringify({ status: 'ok' }), {
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 ```
 
 ### 4. Create API Dockerfile
+
 Create `docker/api.Dockerfile`:
 
 ```dockerfile
@@ -129,12 +137,12 @@ CMD ["node", "build/index.js"]
 ```
 
 ### 5. Update UI to Use External API
+
 Create `src/lib/config.ts`:
 
 ```typescript
-export const API_BASE_URL = 
-  import.meta.env.VITE_API_URL || 
-  (typeof window !== 'undefined' ? '' : 'http://api:3001');
+export const API_BASE_URL =
+	import.meta.env.VITE_API_URL || (typeof window !== 'undefined' ? '' : 'http://api:3001');
 ```
 
 Update API calls in components:
@@ -143,43 +151,45 @@ Update API calls in components:
 import { API_BASE_URL } from '$lib/config';
 
 const response = await fetch(`${API_BASE_URL}/api/steps/${stepId}/notes`, {
-  method: 'POST',
-  credentials: 'include', // For cookies/auth
-  // ...
+	method: 'POST',
+	credentials: 'include' // For cookies/auth
+	// ...
 });
 ```
 
 ### 6. Handle Authentication Across Origins
+
 Update session handling for cross-origin:
 
 ```typescript
 // src/lib/server/auth/session.ts
 export function createSessionCookie(sessionId: string) {
-  return {
-    name: 'session',
-    value: sessionId,
-    options: {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax' as const,
-      domain: process.env.COOKIE_DOMAIN || undefined,
-      path: '/'
-    }
-  };
+	return {
+		name: 'session',
+		value: sessionId,
+		options: {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === 'production',
+			sameSite: 'lax' as const,
+			domain: process.env.COOKIE_DOMAIN || undefined,
+			path: '/'
+		}
+	};
 }
 ```
 
 ### 7. Create Development Script
+
 Add to `package.json`:
 
 ```json
 {
-  "scripts": {
-    "dev": "vite dev",
-    "dev:docker": "docker-compose up api worker -d && vite dev",
-    "docker:api": "docker-compose up api worker",
-    "docker:all": "docker-compose up"
-  }
+	"scripts": {
+		"dev": "vite dev",
+		"dev:docker": "docker-compose up api worker -d && vite dev",
+		"docker:api": "docker-compose up api worker",
+		"docker:all": "docker-compose up"
+	}
 }
 ```
 
@@ -195,40 +205,46 @@ VITE_API_URL=https://api.your-domain.com
 ```
 
 ### 9. Add Proxy for Development (Optional)
+
 Update `vite.config.ts`:
 
 ```typescript
 export default defineConfig({
-  // ...
-  server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3001',
-        changeOrigin: true
-      }
-    }
-  }
+	// ...
+	server: {
+		proxy: {
+			'/api': {
+				target: 'http://localhost:3001',
+				changeOrigin: true
+			}
+		}
+	}
 });
 ```
 
 ### 10. Update Documentation
+
 Update `README.md` with new deployment options:
 
-```markdown
+````markdown
 ## Development
 
 ### Option 1: Full local development
+
 ```bash
 pnpm dev
 ```
+````
 
 ### Option 2: UI local, backend in Docker
+
 ```bash
 docker-compose up api worker -d
 pnpm dev
 ```
 
 ### Option 3: Everything in Docker
+
 ```bash
 docker-compose up
 ```
@@ -236,13 +252,16 @@ docker-compose up
 ## Production Deployment
 
 ### Option A: Deploy UI to Vercel, API to Docker
+
 1. Deploy API: `docker-compose up api worker`
 2. Set `VITE_API_URL` in Vercel
 
 ### Option B: Everything in Docker
+
 ```bash
 docker-compose up
 ```
+
 ```
 
 ## Files to Create/Modify
@@ -269,3 +288,4 @@ docker-compose up
 
 ## Dependencies
 - None - infrastructure change
+```

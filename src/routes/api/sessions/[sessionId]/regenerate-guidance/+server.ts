@@ -41,4 +41,3 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 		throw error(500, 'Failed to queue AI guidance job');
 	}
 };
-

@@ -15,7 +15,10 @@ export async function ingestPrJob(sessionId: string) {
 		.from(table.reviewSessions)
 		.innerJoin(table.pullRequests, eq(table.reviewSessions.pullRequestId, table.pullRequests.id))
 		.innerJoin(table.repos, eq(table.pullRequests.repoId, table.repos.id))
-		.innerJoin(table.githubInstallations, eq(table.repos.installationId, table.githubInstallations.id))
+		.innerJoin(
+			table.githubInstallations,
+			eq(table.repos.installationId, table.githubInstallations.id)
+		)
 		.where(eq(table.reviewSessions.id, sessionId))
 		.get();
 
@@ -24,7 +27,7 @@ export async function ingestPrJob(sessionId: string) {
 	}
 
 	const octokit = getAppOctokit(session.installation.installationId);
-	
+
 	// 1. Fetch PR diff
 	const { data: diff } = await octokit.pulls.get({
 		owner: session.repo.owner,
@@ -42,15 +45,15 @@ export async function ingestPrJob(sessionId: string) {
 		pull_number: session.pr.number
 	});
 
-	// For now, we'll store the raw diff and files info in a temporary way 
+	// For now, we'll store the raw diff and files info in a temporary way
 	// or pass it to the next job. In this MVP, we'll trigger generate_steps.
-	
+
 	console.log(`Ingested PR for session ${sessionId}. Files changed: ${files.length}`);
 
-	await addJob('generate_steps', { 
-		sessionId, 
+	await addJob('generate_steps', {
+		sessionId,
 		diff: diff as unknown as string,
-		files: files.map(f => ({
+		files: files.map((f) => ({
 			filename: f.filename,
 			status: f.status,
 			additions: f.additions,
@@ -59,4 +62,3 @@ export async function ingestPrJob(sessionId: string) {
 		}))
 	});
 }
-

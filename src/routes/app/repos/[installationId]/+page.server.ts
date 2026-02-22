@@ -31,5 +31,3 @@ export const load: PageServerLoad = async ({ params }) => {
 		throw error(500, 'Failed to fetch repositories from GitHub');
 	}
 };
-
-

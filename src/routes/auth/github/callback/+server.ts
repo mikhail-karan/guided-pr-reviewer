@@ -1,7 +1,11 @@
 import { redirect, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getAccessToken, getGithubUser } from '$lib/server/auth/github';
-import { createSession, generateSessionToken, setSessionTokenCookie } from '$lib/server/auth/session';
+import {
+	createSession,
+	generateSessionToken,
+	setSessionTokenCookie
+} from '$lib/server/auth/session';
 import { db } from '$lib/server/db';
 import * as table from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
@@ -19,7 +23,7 @@ export const GET: RequestHandler = async (event) => {
 			console.error('No access token returned from GitHub');
 			throw error(401, 'Failed to get access token');
 		}
-		
+
 		const githubUser = await getGithubUser(access_token);
 
 		// Find or create user
@@ -67,11 +71,9 @@ export const GET: RequestHandler = async (event) => {
 		throw redirect(302, '/app');
 	} catch (err: any) {
 		if (err?.status && err?.location) throw err; // Handle SvelteKit redirect
-		if (err?.status && err?.body) throw err;     // Handle SvelteKit error
-		
+		if (err?.status && err?.body) throw err; // Handle SvelteKit error
+
 		console.error('Auth error:', err);
 		throw error(500, 'Authentication failed');
 	}
 };
-
-

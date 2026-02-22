@@ -42,7 +42,7 @@
 				error = null;
 				const html = await codeToHtml(code, {
 					lang: language,
-					theme: currentTheme,
+					theme: currentTheme
 				});
 				if (!cancelled) {
 					highlightedHtml = html;
@@ -97,8 +97,9 @@
 		background-color: #f3f4f6;
 		padding: 0.5rem;
 		border-radius: 0.25rem;
-		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-			'Courier New', monospace;
+		font-family:
+			ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+			monospace;
 		font-size: 0.875rem;
 	}
 
@@ -117,7 +118,8 @@
 	}
 
 	:global(pre.shiki code) {
-		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-			'Courier New', monospace;
+		font-family:
+			ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+			monospace;
 	}
 </style>

@@ -4,27 +4,27 @@
 	let { data }: { data: PageData } = $props();
 </script>
 
-<div class="max-w-4xl mx-auto p-6">
-	<div class="flex justify-between items-center mb-6">
+<div class="mx-auto max-w-4xl p-6">
+	<div class="mb-6 flex items-center justify-between">
 		<h1 class="text-3xl font-bold dark:text-gray-50">Your GitHub Installations</h1>
 		<div class="flex gap-2">
 			{#if !data.userTokenValid}
-				<a 
-					href="/auth/github" 
-					class="text-sm bg-yellow-100 hover:bg-yellow-200 dark:bg-yellow-900/30 dark:hover:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 px-4 py-2 rounded-md transition border border-yellow-200 dark:border-yellow-800"
+				<a
+					href="/auth/github"
+					class="rounded-md border border-yellow-200 bg-yellow-100 px-4 py-2 text-sm text-yellow-800 transition hover:bg-yellow-200 dark:border-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200 dark:hover:bg-yellow-900/50"
 				>
 					Reconnect GitHub
 				</a>
 			{/if}
-			<button 
-				onclick={() => window.location.reload()} 
-				class="text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-md transition"
+			<button
+				onclick={() => window.location.reload()}
+				class="rounded-md bg-gray-100 px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
 			>
 				Refresh List
 			</button>
 			<a
 				href="https://github.com/apps/{data.githubAppName}/installations/new"
-				class="inline-block bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition"
+				class="inline-block rounded-md bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
 			>
 				Add Installation
 			</a>
@@ -32,14 +32,16 @@
 	</div>
 
 	{#if data.installations.length === 0}
-		<div class="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-lg p-8 text-center">
-			<p class="text-gray-600 dark:text-gray-400 mb-4">No GitHub installations found.</p>
-			<p class="text-sm text-gray-500 dark:text-gray-500 mb-6">
+		<div
+			class="rounded-lg border border-gray-200 bg-gray-50 p-8 text-center dark:border-gray-800 dark:bg-gray-900/50"
+		>
+			<p class="mb-4 text-gray-600 dark:text-gray-400">No GitHub installations found.</p>
+			<p class="mb-6 text-sm text-gray-500 dark:text-gray-500">
 				Install the GitHub App on your personal account or an organization to get started.
 			</p>
 			<a
 				href="https://github.com/apps/{data.githubAppName}/installations/new"
-				class="inline-block bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition"
+				class="inline-block rounded-md bg-blue-600 px-6 py-2 text-white transition hover:bg-blue-700"
 			>
 				Install the App
 			</a>
@@ -48,11 +50,11 @@
 		<div class="grid gap-4">
 			{#each data.installations as installation}
 				<div
-					class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 flex justify-between items-center shadow-sm"
+					class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
 				>
 					<div class="flex items-center gap-4">
 						<div
-							class="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400"
+							class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"
 						>
 							<svg
 								xmlns="http://www.w3.org/2000/svg"
@@ -71,20 +73,22 @@
 							>
 						</div>
 						<div>
-							<h2 class="font-semibold text-lg dark:text-gray-100">{installation.accountLogin}</h2>
-							<p class="text-sm text-gray-500 dark:text-gray-400">Installation ID: {installation.installationId}</p>
+							<h2 class="text-lg font-semibold dark:text-gray-100">{installation.accountLogin}</h2>
+							<p class="text-sm text-gray-500 dark:text-gray-400">
+								Installation ID: {installation.installationId}
+							</p>
 						</div>
 					</div>
 					<div class="flex gap-2">
 						<a
 							href="https://github.com/apps/{data.githubAppName}/installations/new"
-							class="text-sm text-blue-600 dark:text-blue-400 hover:underline mr-4"
+							class="mr-4 text-sm text-blue-600 hover:underline dark:text-blue-400"
 						>
 							Configure
 						</a>
 						<a
 							href="/app/repos/{installation.id}"
-							class="bg-gray-800 dark:bg-gray-700 text-white px-4 py-2 rounded hover:bg-black dark:hover:bg-gray-600 transition"
+							class="rounded bg-gray-800 px-4 py-2 text-white transition hover:bg-black dark:bg-gray-700 dark:hover:bg-gray-600"
 						>
 							View Repos
 						</a>
@@ -94,4 +98,3 @@
 		</div>
 	{/if}
 </div>
-

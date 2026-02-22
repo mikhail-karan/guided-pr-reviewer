@@ -32,6 +32,7 @@
 	let isStreaming = $state(false);
 	let streamingMessageId = $state<string | null>(null);
 	let chatContainer = $state<HTMLElement | null>(null);
+	let chatError = $state<string | null>(null);
 
 	// Inline comment state
 	interface LineInfo {
@@ -43,17 +44,17 @@
 	}
 	let activeInlineComment = $state<LineInfo | null>(null);
 	let inlineCommentFormContainer = $state<HTMLElement | null>(null);
-	let selectionStartLine = $state<{ line: number; side: 'LEFT' | 'RIGHT'; path: string } | null>(null);
+	let selectionStartLine = $state<{ line: number; side: 'LEFT' | 'RIGHT'; path: string } | null>(
+		null
+	);
 
 	// Get inline comments grouped by path and line
 	let inlineComments = $derived(
-		(draftComments as DraftComment[]).filter(c => c.targetType === 'inline' && c.path && c.line)
+		(draftComments as DraftComment[]).filter((c) => c.targetType === 'inline' && c.path && c.line)
 	);
 
 	function getCommentsForLine(path: string, line: number, side: string): DraftComment[] {
-		return inlineComments.filter(
-			c => c.path === path && c.line === line && c.side === side
-		);
+		return inlineComments.filter((c) => c.path === path && c.line === line && c.side === side);
 	}
 
 	function startResizing(e: MouseEvent) {
@@ -98,25 +99,27 @@
 
 	$effect(() => {
 		const diffHunks = safeParse<any[]>(data.step.diffHunksJson, []);
-		const diffString = diffHunks.map((h: any) => {
-			return `--- a/${h.path}\n+++ b/${h.path}\n${h.patch}`;
-		}).join('\n');
-		
+		const diffString = diffHunks
+			.map((h: any) => {
+				return `--- a/${h.path}\n+++ b/${h.path}\n${h.patch}`;
+			})
+			.join('\n');
+
 		const html = Diff2Html.html(diffString, {
 			drawFileList: false,
 			matching: 'lines',
-			outputFormat: 'side-by-side',
+			outputFormat: 'side-by-side'
 		});
-		
+
 		if (diffContainer) {
 			// Remove any existing AI explanation blocks first to prevent duplicates
-			diffContainer.querySelectorAll('.ai-explanation-block').forEach(el => el.remove());
-			
+			diffContainer.querySelectorAll('.ai-explanation-block').forEach((el) => el.remove());
+
 			diffContainer.innerHTML = html;
 
 			// Inject resize handles between side-by-side diffs
 			const diffs = diffContainer.querySelectorAll('.d2h-files-diff');
-			diffs.forEach(diff => {
+			diffs.forEach((diff) => {
 				const sides = diff.querySelectorAll('.d2h-file-side-diff');
 				if (sides.length === 2) {
 					const handle = document.createElement('div');
@@ -125,7 +128,7 @@
 					sides[0].after(handle);
 				}
 			});
-			
+
 			// Highlight code in the diff using Shiki (uses light theme by default)
 			setTimeout(async () => {
 				try {
@@ -134,7 +137,7 @@
 					console.error('Failed to highlight diff code:', err);
 				}
 			}, 50);
-			
+
 			// Inject AI explanation blocks after each hunk if enabled
 			// Use setTimeout to ensure DOM is fully rendered
 			if (showAiExplanations && aiInlineExplanations.length > 0) {
@@ -152,7 +155,11 @@
 	});
 
 	// Extract line information from a diff row element
-	function extractLineInfo(row: HTMLElement, hunks: any[], side: 'LEFT' | 'RIGHT'): LineInfo | null {
+	function extractLineInfo(
+		row: HTMLElement,
+		hunks: any[],
+		side: 'LEFT' | 'RIGHT'
+	): LineInfo | null {
 		// Find the line number cell
 		const lineNumCell = row.querySelector('.d2h-code-side-linenumber');
 		if (!lineNumCell) return null;
@@ -280,7 +287,7 @@
 			const side: 'LEFT' | 'RIGHT' = index === 0 ? 'LEFT' : 'RIGHT';
 			const rows = sideDiff.querySelectorAll('tr');
 
-			rows.forEach(row => {
+			rows.forEach((row) => {
 				const lineNumCell = row.querySelector('.d2h-code-side-linenumber');
 				if (!lineNumCell) return;
 
@@ -294,7 +301,12 @@
 					const lineInfo = extractLineInfo(row as HTMLElement, hunks, side);
 					if (lineInfo) {
 						// Handle shift+click for multi-line selection
-						if (mouseEvent.shiftKey && selectionStartLine && selectionStartLine.side === side && selectionStartLine.path === lineInfo.path) {
+						if (
+							mouseEvent.shiftKey &&
+							selectionStartLine &&
+							selectionStartLine.side === side &&
+							selectionStartLine.path === lineInfo.path
+						) {
 							const startLine = Math.min(selectionStartLine.line, lineInfo.line);
 							const endLine = Math.max(selectionStartLine.line, lineInfo.line);
 							openInlineCommentForm({
@@ -344,9 +356,10 @@
 		formCell.colSpan = 2;
 		formCell.className = 'inline-comment-form-cell';
 
-		const lineRangeText = lineInfo.startLine && lineInfo.startLine !== lineInfo.line
-			? `Lines ${lineInfo.startLine}-${lineInfo.line}`
-			: `Line ${lineInfo.line}`;
+		const lineRangeText =
+			lineInfo.startLine && lineInfo.startLine !== lineInfo.line
+				? `Lines ${lineInfo.startLine}-${lineInfo.line}`
+				: `Line ${lineInfo.line}`;
 
 		formCell.innerHTML = `
 			<div class="inline-comment-form">
@@ -420,7 +433,9 @@
 	// Submit an inline comment
 	async function submitInlineComment(lineInfo: LineInfo, content: string) {
 		const submitBtn = inlineCommentFormContainer?.querySelector('.btn-submit') as HTMLButtonElement;
-		const textarea = inlineCommentFormContainer?.querySelector('.comment-textarea') as HTMLTextAreaElement;
+		const textarea = inlineCommentFormContainer?.querySelector(
+			'.comment-textarea'
+		) as HTMLTextAreaElement;
 
 		if (submitBtn) {
 			submitBtn.disabled = true;
@@ -472,9 +487,11 @@
 		const sideDiffs = diffContainer.querySelectorAll('.d2h-file-side-diff');
 		sideDiffs.forEach((sideDiff, index) => {
 			const side = index === 0 ? 'LEFT' : 'RIGHT';
-			const rows = sideDiff.querySelectorAll('tr:not(.inline-comment-form-row):not(.inline-comment-thread-row)');
+			const rows = sideDiff.querySelectorAll(
+				'tr:not(.inline-comment-form-row):not(.inline-comment-thread-row)'
+			);
 
-			rows.forEach(row => {
+			rows.forEach((row) => {
 				const lineNumCell = row.querySelector('.d2h-code-side-linenumber');
 				if (!lineNumCell) return;
 
@@ -522,7 +539,7 @@
 		// Group comments by path, line, and side
 		const commentGroups = new Map<string, DraftComment[]>();
 
-		inlineComments.forEach(comment => {
+		inlineComments.forEach((comment) => {
 			const key = `${comment.path}:${comment.line}:${comment.side}`;
 			if (!commentGroups.has(key)) {
 				commentGroups.set(key, []);
@@ -538,7 +555,7 @@
 			const side = index === 0 ? 'LEFT' : 'RIGHT';
 			const rows = sideDiff.querySelectorAll('tr');
 
-			rows.forEach(row => {
+			rows.forEach((row) => {
 				const lineInfo = extractLineInfo(row as HTMLElement, hunks, side as 'LEFT' | 'RIGHT');
 				if (!lineInfo) return;
 
@@ -569,12 +586,16 @@
 							<span>${comments.length} comment${comments.length !== 1 ? 's' : ''}</span>
 						</div>
 						<div class="inline-thread-comments">
-							${comments.map(c => `
+							${comments
+								.map(
+									(c) => `
 								<div class="inline-thread-comment">
 									<span class="comment-status status-${c.status}">${c.status}</span>
 									<div class="comment-body">${c.bodyMarkdown}</div>
 								</div>
-							`).join('')}
+							`
+								)
+								.join('')}
 						</div>
 					`;
 
@@ -597,59 +618,61 @@
 		}
 
 		// Remove any existing explanations to prevent duplicates
-		container.querySelectorAll('.ai-explanation-row').forEach(el => el.remove());
-		container.querySelectorAll('.ai-explanation-block').forEach(el => el.remove());
+		container.querySelectorAll('.ai-explanation-row').forEach((el) => el.remove());
+		container.querySelectorAll('.ai-explanation-block').forEach((el) => el.remove());
 
 		console.log(`Injecting ${explanations.length} AI explanations`);
 
 		// Detect if we're in side-by-side mode first
 		const sideDiffs = container.querySelectorAll('.d2h-file-side-diff');
 		const isSideBySide = sideDiffs.length === 2;
-		
+
 		console.log(`Side-by-side mode: ${isSideBySide}, found ${sideDiffs.length} side diffs`);
 
 		// In side-by-side mode, we need to inject into the RIGHT-side table specifically
 		// diff2html creates two separate tables, but hunk header text (@@ ... @@) only shows on left
 		let hunkHeaders: Element[] = [];
-		
+
 		if (isSideBySide) {
 			// Get the right-side container (second .d2h-file-side-diff)
 			const rightSideContainer = sideDiffs[1] as HTMLElement;
-			
+
 			// Look for .d2h-info rows in the right side - these are the hunk separator rows
 			const infoRows = rightSideContainer.querySelectorAll('tr.d2h-info, tr');
-			hunkHeaders = Array.from(infoRows).filter(row => {
+			hunkHeaders = Array.from(infoRows).filter((row) => {
 				// d2h-info class is used for hunk headers
 				if (row.classList.contains('d2h-info')) return true;
 				// Also check for empty info cells that mark hunk boundaries
 				const cells = row.querySelectorAll('td');
-				return cells.length > 0 && Array.from(cells).some(cell => 
-					cell.classList.contains('d2h-info') || 
-					(cell.textContent || '').includes('@@')
+				return (
+					cells.length > 0 &&
+					Array.from(cells).some(
+						(cell) => cell.classList.contains('d2h-info') || (cell.textContent || '').includes('@@')
+					)
 				);
 			});
-			
+
 			console.log(`Found ${hunkHeaders.length} hunk info rows in right-side table`);
-			
+
 			// If still no luck, try finding rows at the same index as left-side hunk headers
 			if (hunkHeaders.length === 0) {
 				const leftSideContainer = sideDiffs[0] as HTMLElement;
-				const leftHunkRows = Array.from(leftSideContainer.querySelectorAll('tr')).filter(row => {
+				const leftHunkRows = Array.from(leftSideContainer.querySelectorAll('tr')).filter((row) => {
 					const text = row.textContent || '';
 					return /@@\s+-\d+/.test(text);
 				});
-				
+
 				console.log(`Found ${leftHunkRows.length} hunk headers in left-side table`);
-				
+
 				// For each left hunk row, find the corresponding row in the right table
 				const rightTable = rightSideContainer.querySelector('table');
 				const leftTable = leftSideContainer.querySelector('table');
-				
+
 				if (rightTable && leftTable) {
 					const rightRows = rightTable.querySelectorAll('tr');
 					const leftRows = leftTable.querySelectorAll('tr');
-					
-					leftHunkRows.forEach(leftRow => {
+
+					leftHunkRows.forEach((leftRow) => {
 						const leftIndex = Array.from(leftRows).indexOf(leftRow);
 						if (leftIndex >= 0 && leftIndex < rightRows.length) {
 							hunkHeaders.push(rightRows[leftIndex]);
@@ -661,18 +684,20 @@
 		} else {
 			// Non-side-by-side mode: find hunk headers normally
 			const allRows = container.querySelectorAll('tr');
-			hunkHeaders = Array.from(allRows).filter(row => {
+			hunkHeaders = Array.from(allRows).filter((row) => {
 				const text = row.textContent || '';
 				return /@@\s+-\d+/.test(text);
 			});
 		}
-		
+
 		console.log(`Final hunk headers count: ${hunkHeaders.length}`);
 
 		if (hunkHeaders.length === 0) {
 			console.warn('Could not find hunk headers, using fallback insertion');
 			// Fallback: Find the first actual code line (not the header) and insert before it
-			const firstCodeLine = container.querySelector('.d2h-code-line, .d2h-code-line-ctn, tr.d2h-code-line');
+			const firstCodeLine = container.querySelector(
+				'.d2h-code-line, .d2h-code-line-ctn, tr.d2h-code-line'
+			);
 			if (firstCodeLine) {
 				const explanation = explanations[0]; // Use first explanation
 				const explanationBlock = document.createElement('div');
@@ -697,11 +722,11 @@
 		hunkHeaders.forEach((header, index) => {
 			// Since we're already searching only in the right-side container,
 			// we don't need to filter by side again
-			const explanation = explanations.find(e => e.hunkIndex === index);
-			
+			const explanation = explanations.find((e) => e.hunkIndex === index);
+
 			console.log(`Looking for explanation at index ${index}, found: ${!!explanation}`);
 			if (!explanation) return;
-			
+
 			console.log(`Injecting explanation: ${explanation.explanation.substring(0, 60)}...`);
 
 			// Find the hunk header row
@@ -736,7 +761,7 @@
 			// Create a new row for the explanation
 			const explanationRow = document.createElement('tr');
 			explanationRow.className = 'ai-explanation-row';
-			
+
 			// In side-by-side mode, we are in a table that ONLY represents one side
 			// So we just need a single td that spans the width of this side's table
 			const cell = document.createElement('td');
@@ -754,31 +779,31 @@
 				const leftSideContainer = sideDiffs[0] as HTMLElement;
 				const leftTable = leftSideContainer.querySelector('table');
 				const rightTable = hunkRow.closest('table');
-				
+
 				if (leftTable && rightTable) {
 					const rightRows = Array.from(rightTable.querySelectorAll('tr'));
 					const rowIndex = rightRows.indexOf(hunkRow);
 					const leftRows = Array.from(leftTable.querySelectorAll('tr'));
-					
+
 					if (rowIndex >= 0 && rowIndex < leftRows.length) {
 						const leftHunkRow = leftRows[rowIndex];
-						
+
 						// Create a matching spacer row for the left side
 						const leftSpacerRow = document.createElement('tr');
 						leftSpacerRow.className = 'ai-explanation-row ai-explanation-spacer-row';
-						
+
 						const leftSpacerCell = document.createElement('td');
 						leftSpacerCell.colSpan = leftHunkRow.querySelectorAll('td, th').length || 2;
 						leftSpacerCell.className = 'ai-explanation-cell-left';
-						
+
 						const spacer = document.createElement('div');
 						spacer.className = 'ai-explanation-spacer-left';
 						// We'll set the height after both rows are in the DOM to ensure exact matching
-						
+
 						leftSpacerCell.appendChild(spacer);
 						leftSpacerRow.appendChild(leftSpacerCell);
 						leftHunkRow.after(leftSpacerRow);
-						
+
 						// Sync heights
 						setTimeout(() => {
 							const height = explanationRow.offsetHeight;
@@ -793,9 +818,9 @@
 	// Toggle explanations visibility when showAiExplanations changes
 	$effect(() => {
 		if (!diffContainer) return;
-		
+
 		const explanationRows = diffContainer.querySelectorAll('.ai-explanation-row');
-		
+
 		if (showAiExplanations && aiInlineExplanations.length > 0) {
 			// If explanations should be shown but aren't present, re-inject them
 			if (explanationRows.length === 0) {
@@ -805,27 +830,41 @@
 				}, 100);
 			} else {
 				// Show existing rows
-				explanationRows.forEach(row => {
+				explanationRows.forEach((row) => {
 					(row as HTMLElement).style.display = '';
 				});
 			}
 		} else {
 			// Hide explanation rows
-			explanationRows.forEach(row => {
+			explanationRows.forEach((row) => {
 				(row as HTMLElement).style.display = 'none';
 			});
 		}
 	});
 
-	let aiGuidance = $derived(safeParse<{ summary: string; risks: any[]; reviewQuestions: string[] }>(data.step.aiGuidanceJson, null as any, 'summary'));
+	let aiGuidance = $derived(
+		safeParse<{ summary: string; risks: any[]; reviewQuestions: string[] }>(
+			data.step.aiGuidanceJson,
+			null as any,
+			'summary'
+		)
+	);
 	let aiSummaryHtml = $derived(aiGuidance ? parseMarkdown(aiGuidance.summary) : '');
 	let aiSummaryContainer = $state<HTMLElement | null>(null);
-	let aiInlineExplanations = $derived(safeParse<Array<{ hunkIndex: number; path: string; lineRange: string; explanation: string }>>(data.step.aiInlineExplanationsJson, []));
+	let aiInlineExplanations = $derived(
+		safeParse<Array<{ hunkIndex: number; path: string; lineRange: string; explanation: string }>>(
+			data.step.aiInlineExplanationsJson,
+			[]
+		)
+	);
 
 	// Debug logging
 	$effect(() => {
 		if (aiInlineExplanations.length > 0) {
-			console.log(`Loaded ${aiInlineExplanations.length} AI inline explanations:`, aiInlineExplanations);
+			console.log(
+				`Loaded ${aiInlineExplanations.length} AI inline explanations:`,
+				aiInlineExplanations
+			);
 		} else {
 			console.log('No AI inline explanations found. Raw data:', data.step.aiInlineExplanationsJson);
 		}
@@ -880,9 +919,9 @@
 			const res = await fetch(`/api/steps/${data.step.id}/draft-comments`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ 
-					targetType: 'conversation', 
-					bodyMarkdown: commentContent 
+				body: JSON.stringify({
+					targetType: 'conversation',
+					bodyMarkdown: commentContent
 				})
 			});
 			if (res.ok) {
@@ -902,17 +941,21 @@
 		const userMessage = chatInput.trim();
 		chatInput = '';
 		isStreaming = true;
+		chatError = null;
 
 		// Add user message optimistically (will be replaced by persisted version on reload)
 		const tempUserMessageId = `temp-user-${Date.now()}`;
-		chatMessages = [...chatMessages, {
-			id: tempUserMessageId,
-			stepId: data.step.id,
-			authorUserId: '',
-			role: 'user' as const,
-			content: userMessage,
-			createdAt: new Date()
-		}];
+		chatMessages = [
+			...chatMessages,
+			{
+				id: tempUserMessageId,
+				stepId: data.step.id,
+				authorUserId: '',
+				role: 'user' as const,
+				content: userMessage,
+				createdAt: new Date()
+			}
+		];
 
 		// Create placeholder for assistant response
 		streamingMessageId = `streaming-${Date.now()}`;
@@ -934,6 +977,20 @@
 			}
 		}, 100);
 
+		let fullContent = '';
+		const finalizeStreamingError = (errorMessage: string) => {
+			const hasPartialResponse = fullContent.trim().length > 0;
+			if (hasPartialResponse) {
+				chatMessages = chatMessages.map((msg: any) =>
+					msg.id === streamingMessageId ? { ...msg, content: fullContent } : msg
+				);
+				chatError = `Response interrupted: ${errorMessage}`;
+			} else {
+				chatMessages = chatMessages.filter((msg: any) => msg.id !== streamingMessageId);
+				chatError = `Failed to send message: ${errorMessage}`;
+			}
+		};
+
 		try {
 			const res = await fetch(`/api/steps/${data.step.id}/chat`, {
 				method: 'POST',
@@ -953,7 +1010,6 @@
 			}
 
 			let buffer = '';
-			let fullContent = '';
 
 			while (true) {
 				const { done, value } = await reader.read();
@@ -973,9 +1029,7 @@
 									fullContent += parsed.content;
 									// Update streaming message
 									chatMessages = chatMessages.map((msg: any) =>
-										msg.id === streamingMessageId
-											? { ...msg, content: fullContent }
-											: msg
+										msg.id === streamingMessageId ? { ...msg, content: fullContent } : msg
 									);
 									// Scroll to bottom as content streams
 									setTimeout(() => {
@@ -992,9 +1046,7 @@
 									return;
 								}
 								if (parsed.error) {
-									// Remove streaming message and show error
-									chatMessages = chatMessages.filter((msg: any) => msg.id !== streamingMessageId);
-									alert('Error: ' + parsed.error);
+									finalizeStreamingError(parsed.error);
 									isStreaming = false;
 									streamingMessageId = null;
 									return;
@@ -1008,9 +1060,7 @@
 			}
 		} catch (err: any) {
 			console.error('Error sending chat message:', err);
-			// Remove streaming message on error
-			chatMessages = chatMessages.filter((msg: any) => msg.id !== streamingMessageId);
-			alert('Failed to send message: ' + (err.message || 'Unknown error'));
+			finalizeStreamingError(err.message || 'Unknown error');
 		} finally {
 			isStreaming = false;
 			streamingMessageId = null;
@@ -1042,53 +1092,104 @@
 	});
 </script>
 
-<div class="h-screen flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 {isResizing || isResizingDiff ? 'cursor-col-resize select-none' : ''} {isResizingDiff ? 'is-resizing-diff' : ''}">
+<div
+	class="flex h-screen flex-col overflow-hidden bg-gray-50 dark:bg-gray-900 {isResizing ||
+	isResizingDiff
+		? 'cursor-col-resize select-none'
+		: ''} {isResizingDiff ? 'is-resizing-diff' : ''}"
+>
 	<!-- Top Bar -->
-	<header class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex justify-between items-center shrink-0">
+	<header
+		class="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-6 py-3 dark:border-gray-800 dark:bg-gray-900"
+	>
 		<div class="flex items-center gap-4">
-			<a href="/app/sessions/{data.session.id}" class="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200" aria-label="Back to session plan">
-				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+			<a
+				href="/app/sessions/{data.session.id}"
+				class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+				aria-label="Back to session plan"
+			>
+				<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+					><path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M10 19l-7-7m0 0l7-7m-7 7h18"
+					/></svg
+				>
 			</a>
 			<div>
 				<div class="flex items-center gap-2">
-					<h1 class="font-bold text-lg leading-tight dark:text-gray-100">{data.step.title}</h1>
-					<span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 font-medium">Step {data.currentStepNumber} of {data.totalSteps}</span>
+					<h1 class="text-lg leading-tight font-bold dark:text-gray-100">{data.step.title}</h1>
+					<span
+						class="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+						>Step {data.currentStepNumber} of {data.totalSteps}</span
+					>
 				</div>
-				<p class="text-xs text-gray-500 dark:text-gray-400">{data.repo.owner}/{data.repo.name} • PR #{data.pr.number}</p>
+				<p class="text-xs text-gray-500 dark:text-gray-400">
+					{data.repo.owner}/{data.repo.name} • PR #{data.pr.number}
+				</p>
 			</div>
 		</div>
 
 		<div class="flex items-center gap-4">
-			<div class="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+			<div class="flex items-center rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
 				{#if data.prevStepId}
-					<a 
-						href="/app/sessions/{data.session.id}/steps/{data.prevStepId}" 
-						class="p-1.5 hover:bg-white dark:hover:bg-gray-700 rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-all"
+					<a
+						href="/app/sessions/{data.session.id}/steps/{data.prevStepId}"
+						class="rounded-md p-1.5 text-gray-500 transition-all hover:bg-white hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
 						title="Previous Step"
 					>
-						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+						<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M15 19l-7-7 7-7"
+							/></svg
+						>
 					</a>
 				{:else}
-					<span class="p-1.5 text-gray-300 dark:text-gray-600 cursor-not-allowed">
-						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+					<span class="cursor-not-allowed p-1.5 text-gray-300 dark:text-gray-600">
+						<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M15 19l-7-7 7-7"
+							/></svg
+						>
 					</span>
 				{/if}
 
 				{#if data.nextStepId}
-					<a 
-						href="/app/sessions/{data.session.id}/steps/{data.nextStepId}" 
-						class="p-1.5 hover:bg-white dark:hover:bg-gray-700 rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-all"
+					<a
+						href="/app/sessions/{data.session.id}/steps/{data.nextStepId}"
+						class="rounded-md p-1.5 text-gray-500 transition-all hover:bg-white hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
 						title="Next Step"
 					>
-						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+						<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9 5l7 7-7 7"
+							/></svg
+						>
 					</a>
 				{:else}
-					<a 
-						href="/app/sessions/{data.session.id}/wrap-up" 
-						class="p-1.5 hover:bg-white dark:hover:bg-gray-700 rounded-md text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-all"
+					<a
+						href="/app/sessions/{data.session.id}/wrap-up"
+						class="rounded-md p-1.5 text-blue-600 transition-all hover:bg-white hover:text-blue-800 dark:text-blue-400 dark:hover:bg-gray-700 dark:hover:text-blue-300"
 						title="Finish Review"
 					>
-						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+						<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M5 13l4 4L19 7"
+							/></svg
+						>
 					</a>
 				{/if}
 			</div>
@@ -1096,13 +1197,17 @@
 			<div class="h-6 w-px bg-gray-200 dark:bg-gray-700"></div>
 
 			<form method="POST" action="?/updateStatus" use:enhance>
-				<select 
-					name="status" 
-					class="text-sm border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 rounded-md focus:ring-blue-500 py-1.5"
+				<select
+					name="status"
+					class="rounded-md border-gray-300 py-1.5 text-sm focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
 					onchange={(e) => e.currentTarget.form?.requestSubmit()}
 				>
-					<option value="not_started" selected={data.step.status === 'not_started'}>Not Started</option>
-					<option value="in_progress" selected={data.step.status === 'in_progress'}>In Progress</option>
+					<option value="not_started" selected={data.step.status === 'not_started'}
+						>Not Started</option
+					>
+					<option value="in_progress" selected={data.step.status === 'in_progress'}
+						>In Progress</option
+					>
 					<option value="reviewed" selected={data.step.status === 'reviewed'}>Reviewed</option>
 					<option value="follow_up" selected={data.step.status === 'follow_up'}>Follow Up</option>
 				</select>
@@ -1110,37 +1215,50 @@
 		</div>
 	</header>
 
-	<main class="flex-1 flex overflow-hidden">
+	<main class="flex flex-1 overflow-hidden">
 		<!-- Main Content (Diff) -->
-		<div class="flex-1 overflow-auto bg-gray-100 dark:bg-gray-900 p-2 md:p-4">
+		<div class="flex-1 overflow-auto bg-gray-100 p-2 md:p-4 dark:bg-gray-900">
 			<div class="w-full max-w-none">
-				<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
-					<div class="px-4 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
-						<span class="text-xs font-mono text-gray-600 dark:text-gray-400">{data.step.title}</span>
+				<div
+					class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
+				>
+					<div
+						class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-2 dark:border-gray-800 dark:bg-gray-800"
+					>
+						<span class="font-mono text-xs text-gray-600 dark:text-gray-400">{data.step.title}</span
+						>
 						<div class="flex items-center gap-3">
 							{#if aiInlineExplanations.length > 0}
 								<button
-									onclick={() => showAiExplanations = !showAiExplanations}
-									class="flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md transition-colors {showAiExplanations ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900/50' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'}"
+									onclick={() => (showAiExplanations = !showAiExplanations)}
+									class="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors {showAiExplanations
+										? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50'
+										: 'bg-gray-200 text-gray-600 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'}"
 									title={showAiExplanations ? 'Hide AI explanations' : 'Show AI explanations'}
 								>
-									<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+									<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+										/>
 									</svg>
 									AI Explanations
 								</button>
 							{/if}
 							<div class="flex gap-2">
-								<div class="w-2 h-2 rounded-full bg-red-400"></div>
-								<div class="w-2 h-2 rounded-full bg-yellow-400"></div>
-								<div class="w-2 h-2 rounded-full bg-green-400"></div>
+								<div class="h-2 w-2 rounded-full bg-red-400"></div>
+								<div class="h-2 w-2 rounded-full bg-yellow-400"></div>
+								<div class="h-2 w-2 rounded-full bg-green-400"></div>
 							</div>
 						</div>
 					</div>
 					<div
 						bind:this={diffContainer}
-						class="min-w-full overflow-x-auto diff-container"
-						style="--diff-left-width: {diffSplitPercent}%; --diff-right-width: {100 - diffSplitPercent}%"
+						class="diff-container min-w-full overflow-x-auto"
+						style="--diff-left-width: {diffSplitPercent}%; --diff-right-width: {100 -
+							diffSplitPercent}%"
 					></div>
 				</div>
 			</div>
@@ -1149,72 +1267,118 @@
 		<!-- Sidebar (Guidance & Notes) -->
 		<div class="relative flex shrink-0" style="width: {sidebarWidth}px;">
 			<!-- Resize Handle -->
-			<button 
-				class="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 transition-colors z-10 appearance-none border-none p-0 bg-transparent"
+			<button
+				class="absolute top-0 bottom-0 left-0 z-10 w-1 cursor-col-resize appearance-none border-none bg-transparent p-0 transition-colors hover:bg-blue-400"
 				onmousedown={startResizing}
 				aria-label="Resize sidebar"
 			></button>
 
-			<aside class="flex-1 border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex flex-col overflow-hidden">
+			<aside
+				class="flex flex-1 flex-col overflow-hidden border-l border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+			>
 				<div class="flex border-b border-gray-200 dark:border-gray-800">
-					<button 
-						class="flex-1 py-3 text-sm font-medium border-b-2 transition-colors {activeTab === 'guidance' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'}"
-						onclick={() => activeTab = 'guidance'}
+					<button
+						class="flex-1 border-b-2 py-3 text-sm font-medium transition-colors {activeTab ===
+						'guidance'
+							? 'border-blue-500 text-blue-600 dark:text-blue-400'
+							: 'border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'}"
+						onclick={() => (activeTab = 'guidance')}
 					>
 						Guidance
 					</button>
-					<button 
-						class="flex-1 py-3 text-sm font-medium border-b-2 transition-colors {activeTab === 'notes' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'}"
-						onclick={() => activeTab = 'notes'}
+					<button
+						class="flex-1 border-b-2 py-3 text-sm font-medium transition-colors {activeTab ===
+						'notes'
+							? 'border-blue-500 text-blue-600 dark:text-blue-400'
+							: 'border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'}"
+						onclick={() => (activeTab = 'notes')}
 					>
 						Notes & Comments
 					</button>
 				</div>
 
-				<div class="flex-1 flex flex-col overflow-hidden p-4 gap-4">
+				<div class="flex flex-1 flex-col gap-4 overflow-hidden p-4">
 					{#if activeTab === 'guidance'}
 						<!-- Guidance Section -->
-						<div class="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden flex flex-col {guidanceExpanded ? 'flex-1 min-h-0' : 'shrink-0'}">
+						<div
+							class="flex flex-col overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800 {guidanceExpanded
+								? 'min-h-0 flex-1'
+								: 'shrink-0'}"
+						>
 							<button
-								onclick={() => guidanceExpanded = !guidanceExpanded}
-								class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between transition-colors shrink-0"
+								onclick={() => (guidanceExpanded = !guidanceExpanded)}
+								class="flex w-full shrink-0 items-center justify-between bg-gray-50 px-4 py-3 transition-colors hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700"
 							>
-								<h2 class="text-sm font-bold uppercase text-gray-600 dark:text-gray-300 tracking-wider">Guidance</h2>
+								<h2
+									class="text-sm font-bold tracking-wider text-gray-600 uppercase dark:text-gray-300"
+								>
+									Guidance
+								</h2>
 								<svg
-									class="w-4 h-4 text-gray-500 transition-transform {guidanceExpanded ? 'rotate-180' : ''}"
+									class="h-4 w-4 text-gray-500 transition-transform {guidanceExpanded
+										? 'rotate-180'
+										: ''}"
 									fill="none"
 									stroke="currentColor"
 									viewBox="0 0 24 24"
 								>
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M19 9l-7 7-7-7"
+									/>
 								</svg>
 							</button>
 							{#if guidanceExpanded}
-								<div class="p-4 space-y-6 overflow-y-auto">
+								<div class="space-y-6 overflow-y-auto p-4">
 									{#if aiGuidance}
 										<section>
-											<h3 class="text-sm font-bold uppercase text-gray-400 dark:text-gray-500 mb-2 tracking-wider">AI Summary</h3>
-											<div bind:this={aiSummaryContainer} class="prose prose-sm max-w-none text-gray-700 dark:text-gray-300">
+											<h3
+												class="mb-2 text-sm font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500"
+											>
+												AI Summary
+											</h3>
+											<div
+												bind:this={aiSummaryContainer}
+												class="prose prose-sm max-w-none text-gray-700 dark:text-gray-300"
+											>
 												{@html aiSummaryHtml}
 											</div>
 										</section>
 
 										{#if aiGuidance.risks?.length}
 											<section>
-												<h3 class="text-sm font-bold uppercase text-gray-400 dark:text-gray-500 mb-2 tracking-wider">Potential Risks</h3>
+												<h3
+													class="mb-2 text-sm font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500"
+												>
+													Potential Risks
+												</h3>
 												<ul class="space-y-2">
 													{#each aiGuidance.risks as risk}
 														<li
-															class="text-sm bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 dark:border-red-600 p-2 text-red-700 dark:text-red-300 {risk.lines?.length ? 'cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors' : ''}"
-															onmouseenter={() => { if (risk.lines?.length) highlightDiffLines(risk.lines); }}
+															class="border-l-4 border-red-400 bg-red-50 p-2 text-sm text-red-700 dark:border-red-600 dark:bg-red-900/20 dark:text-red-300 {risk
+																.lines?.length
+																? 'cursor-pointer transition-colors hover:bg-red-100 dark:hover:bg-red-900/40'
+																: ''}"
+															onmouseenter={() => {
+																if (risk.lines?.length) highlightDiffLines(risk.lines);
+															}}
 															onmouseleave={() => clearDiffHighlights()}
-															onclick={() => { if (risk.lines?.length) { highlightDiffLines(risk.lines); scrollToRiskLines(risk.lines); } }}
+															onclick={() => {
+																if (risk.lines?.length) {
+																	highlightDiffLines(risk.lines);
+																	scrollToRiskLines(risk.lines);
+																}
+															}}
 														>
 															<span>{risk.description}</span>
 															{#if risk.lines?.length}
-																<div class="flex flex-wrap gap-1 mt-1.5">
+																<div class="mt-1.5 flex flex-wrap gap-1">
 																	{#each risk.lines as line}
-																		<span class="inline-flex items-center text-[10px] font-mono bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded">
+																		<span
+																			class="inline-flex items-center rounded bg-red-100 px-1.5 py-0.5 font-mono text-[10px] text-red-600 dark:bg-red-900/40 dark:text-red-400"
+																		>
 																			{line.path.split('/').pop()}:{line.startLine}-{line.endLine}
 																		</span>
 																	{/each}
@@ -1228,11 +1392,20 @@
 
 										{#if aiGuidance.reviewQuestions?.length}
 											<section>
-												<h3 class="text-sm font-bold uppercase text-gray-400 dark:text-gray-500 mb-2 tracking-wider">Review Checklist</h3>
+												<h3
+													class="mb-2 text-sm font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500"
+												>
+													Review Checklist
+												</h3>
 												<ul class="space-y-2">
 													{#each aiGuidance.reviewQuestions as question}
-														<li class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
-															<input type="checkbox" class="mt-1 rounded text-blue-600 dark:bg-gray-800 dark:border-gray-700" />
+														<li
+															class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300"
+														>
+															<input
+																type="checkbox"
+																class="mt-1 rounded text-blue-600 dark:border-gray-700 dark:bg-gray-800"
+															/>
 															<span>{question}</span>
 														</li>
 													{/each}
@@ -1241,31 +1414,48 @@
 										{/if}
 									{:else}
 										<div class="py-12 text-center">
-											<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400 mx-auto mb-4"></div>
+											<div
+												class="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600 dark:border-blue-400"
+											></div>
 											<p class="text-sm text-gray-500 dark:text-gray-400">Generating guidance...</p>
 										</div>
 									{/if}
 
-									<section class="border-t dark:border-gray-800 pt-6">
-										<h3 class="text-sm font-bold uppercase text-gray-400 dark:text-gray-500 mb-4 tracking-wider">Context Pack</h3>
+									<section class="border-t pt-6 dark:border-gray-800">
+										<h3
+											class="mb-4 text-sm font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500"
+										>
+											Context Pack
+										</h3>
 										{#if data.contextPack}
 											{@const items = safeParse<any[]>(data.contextPack.itemsJson, [])}
 											{#if items.length === 0}
-												<p class="text-sm text-gray-500 dark:text-gray-400 italic">No context items found.</p>
+												<p class="text-sm text-gray-500 italic dark:text-gray-400">
+													No context items found.
+												</p>
 											{:else}
 												<ul class="space-y-2">
 													{#each items as item}
-														<li class="text-xs bg-gray-50 dark:bg-gray-800/50 p-2 border border-gray-200 dark:border-gray-800 rounded">
-															<span class="font-bold block mb-1 dark:text-gray-200">{item.type}: {item.path}</span>
+														<li
+															class="rounded border border-gray-200 bg-gray-50 p-2 text-xs dark:border-gray-800 dark:bg-gray-800/50"
+														>
+															<span class="mb-1 block font-bold dark:text-gray-200"
+																>{item.type}: {item.path}</span
+															>
 															<div class="overflow-x-auto">
-																<CodeHighlighter code={item.snippet} language={detectLanguage(item.path)} />
+																<CodeHighlighter
+																	code={item.snippet}
+																	language={detectLanguage(item.path)}
+																/>
 															</div>
 														</li>
 													{/each}
 												</ul>
 											{/if}
 										{:else}
-											<p class="text-sm text-gray-500 dark:text-gray-400 italic">Context pack loading...</p>
+											<p class="text-sm text-gray-500 italic dark:text-gray-400">
+												Context pack loading...
+											</p>
 										{/if}
 									</section>
 								</div>
@@ -1273,55 +1463,105 @@
 						</div>
 
 						<!-- Chat Section -->
-						<div class="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden flex flex-col {chatExpanded ? 'flex-1 min-h-0' : 'shrink-0'}">
+						<div
+							class="flex flex-col overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800 {chatExpanded
+								? 'min-h-0 flex-1'
+								: 'shrink-0'}"
+						>
 							<button
-								onclick={() => chatExpanded = !chatExpanded}
-								class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between transition-colors shrink-0"
+								onclick={() => (chatExpanded = !chatExpanded)}
+								class="flex w-full shrink-0 items-center justify-between bg-gray-50 px-4 py-3 transition-colors hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700"
 							>
-								<h2 class="text-sm font-bold uppercase text-gray-600 dark:text-gray-300 tracking-wider">Chat</h2>
+								<h2
+									class="text-sm font-bold tracking-wider text-gray-600 uppercase dark:text-gray-300"
+								>
+									Chat
+								</h2>
 								<svg
-									class="w-4 h-4 text-gray-500 transition-transform {chatExpanded ? 'rotate-180' : ''}"
+									class="h-4 w-4 text-gray-500 transition-transform {chatExpanded
+										? 'rotate-180'
+										: ''}"
 									fill="none"
 									stroke="currentColor"
 									viewBox="0 0 24 24"
 								>
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M19 9l-7 7-7-7"
+									/>
 								</svg>
 							</button>
 							{#if chatExpanded}
-								<div class="flex-1 flex flex-col min-h-0 overflow-hidden">
+								<div class="flex min-h-0 flex-1 flex-col overflow-hidden">
 									<!-- Chat Messages -->
-									<div
-										bind:this={chatContainer}
-										class="flex-1 overflow-y-auto p-4 space-y-4"
-									>
+									<div bind:this={chatContainer} class="flex-1 space-y-4 overflow-y-auto p-4">
 										{#if chatMessages.length === 0}
-											<div class="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
+											<div class="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
 												<p>Ask questions about the code changes in this step.</p>
 											</div>
 										{:else}
 											{#each chatMessages as message}
-												<div class="flex gap-3 chat-message {message.role === 'user' ? 'justify-end' : 'justify-start'}">
+												<div
+													class="chat-message flex gap-3 {message.role === 'user'
+														? 'justify-end'
+														: 'justify-start'}"
+												>
 													{#if message.role === 'assistant'}
-														<div class="shrink-0 w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center mt-1">
-															<svg class="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-																<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+														<div
+															class="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/50"
+														>
+															<svg
+																class="h-4 w-4 text-indigo-600 dark:text-indigo-400"
+																fill="none"
+																stroke="currentColor"
+																viewBox="0 0 24 24"
+															>
+																<path
+																	stroke-linecap="round"
+																	stroke-linejoin="round"
+																	stroke-width="2"
+																	d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+																/>
 															</svg>
 														</div>
 													{/if}
-													<div class="max-w-[85%] chat-bubble {message.role === 'user' ? 'bg-blue-600 text-white rounded-2xl rounded-tr-none shadow-blue-100 dark:shadow-none' : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-100 dark:border-gray-700 rounded-2xl rounded-tl-none chat-bubble-assistant'} px-4 py-2 text-[13px] leading-relaxed">
+													<div
+														class="chat-bubble max-w-[85%] {message.role === 'user'
+															? 'rounded-2xl rounded-tr-none bg-blue-600 text-white shadow-blue-100 dark:shadow-none'
+															: 'chat-bubble-assistant rounded-2xl rounded-tl-none border border-gray-100 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100'} px-4 py-2 text-[13px] leading-relaxed"
+													>
 														{#if message.role === 'assistant'}
-															<div class="prose prose-sm max-w-none text-gray-800 dark:text-gray-200">
-																{@html (message.content && message.content.trim() ? parseMarkdown(message.content) : (isStreaming && message.id === streamingMessageId ? '<span class="text-gray-400 italic animate-pulse">Thinking...</span>' : ''))}
+															<div
+																class="prose prose-sm max-w-none text-gray-800 dark:text-gray-200"
+															>
+																{@html message.content && message.content.trim()
+																	? parseMarkdown(message.content)
+																	: isStreaming && message.id === streamingMessageId
+																		? '<span class="text-gray-400 italic animate-pulse">Thinking...</span>'
+																		: ''}
 															</div>
 														{:else}
 															<div>{message.content}</div>
 														{/if}
 													</div>
 													{#if message.role === 'user'}
-														<div class="shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center mt-1">
-															<svg class="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-																<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+														<div
+															class="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/50"
+														>
+															<svg
+																class="h-4 w-4 text-blue-600 dark:text-blue-400"
+																fill="none"
+																stroke="currentColor"
+																viewBox="0 0 24 24"
+															>
+																<path
+																	stroke-linecap="round"
+																	stroke-linejoin="round"
+																	stroke-width="2"
+																	d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+																/>
 															</svg>
 														</div>
 													{/if}
@@ -1331,30 +1571,60 @@
 									</div>
 
 									<!-- Chat Input -->
-									<div class="border-t border-gray-100 dark:border-gray-800 p-4 bg-gray-50/50 dark:bg-gray-900/50 chat-input-container">
-										<div class="flex gap-2 items-end">
+									<div
+										class="chat-input-container border-t border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-gray-900/50"
+									>
+										{#if chatError}
+											<div
+												class="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200"
+											>
+												{chatError}
+											</div>
+										{/if}
+										<div class="flex items-end gap-2">
 											<textarea
 												bind:value={chatInput}
 												onkeydown={handleChatKeydown}
 												placeholder="Ask a question..."
 												disabled={isStreaming}
-												class="flex-1 text-[13px] border-gray-200 dark:border-gray-700 rounded-xl focus:ring-blue-500 focus:border-blue-500 resize-none px-3 py-2 bg-white dark:bg-gray-800 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all"
+												class="flex-1 resize-none rounded-xl border-gray-200 bg-white px-3 py-2 text-[13px] shadow-sm transition-all focus:border-blue-500 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
 												rows="1"
 												style="min-height: 38px; max-height: 120px;"
 											></textarea>
 											<button
 												onclick={sendChatMessage}
 												disabled={!chatInput.trim() || isStreaming}
-												class="shrink-0 w-9 h-9 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-md shadow-blue-100 dark:shadow-none"
+												class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-md shadow-blue-100 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:shadow-none"
 											>
 												{#if isStreaming}
-													<svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-														<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-														<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+													<svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+														<circle
+															class="opacity-25"
+															cx="12"
+															cy="12"
+															r="10"
+															stroke="currentColor"
+															stroke-width="4"
+														></circle>
+														<path
+															class="opacity-75"
+															fill="currentColor"
+															d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+														></path>
 													</svg>
 												{:else}
-													<svg class="w-4 h-4 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+													<svg
+														class="h-4 w-4 rotate-90"
+														fill="none"
+														stroke="currentColor"
+														viewBox="0 0 24 24"
+													>
+														<path
+															stroke-linecap="round"
+															stroke-linejoin="round"
+															stroke-width="2"
+															d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+														/>
 													</svg>
 												{/if}
 											</button>
@@ -1367,16 +1637,29 @@
 						<!-- Notes & Comments Tab -->
 						<div class="space-y-6 overflow-y-auto">
 							<section>
-								<h2 class="text-sm font-bold uppercase text-gray-400 dark:text-gray-500 mb-4 tracking-wider">Your Review Notes</h2>
+								<h2
+									class="mb-4 text-sm font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500"
+								>
+									Your Review Notes
+								</h2>
 								{#if notes.length === 0}
-									<p class="text-sm text-gray-500 dark:text-gray-400 italic">No internal notes yet.</p>
+									<p class="text-sm text-gray-500 italic dark:text-gray-400">
+										No internal notes yet.
+									</p>
 								{:else}
 									<ul class="space-y-4">
 										{#each notes as note}
-											<li class="text-sm bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-900/30 rounded-md p-3">
-												<div class="flex justify-between items-center mb-1">
-													<span class="text-xs font-bold uppercase text-yellow-700 dark:text-yellow-400">{note.severity}</span>
-													<span class="text-[10px] text-gray-400 dark:text-gray-500">{new Date(note.createdAt).toLocaleTimeString()}</span>
+											<li
+												class="rounded-md border border-yellow-100 bg-yellow-50 p-3 text-sm dark:border-yellow-900/30 dark:bg-yellow-900/20"
+											>
+												<div class="mb-1 flex items-center justify-between">
+													<span
+														class="text-xs font-bold text-yellow-700 uppercase dark:text-yellow-400"
+														>{note.severity}</span
+													>
+													<span class="text-[10px] text-gray-400 dark:text-gray-500"
+														>{new Date(note.createdAt).toLocaleTimeString()}</span
+													>
 												</div>
 												<div class="text-gray-800 dark:text-gray-200">{note.noteMarkdown}</div>
 											</li>
@@ -1385,21 +1668,37 @@
 								{/if}
 							</section>
 
-							<section class="border-t dark:border-gray-800 pt-6">
-								<h2 class="text-sm font-bold uppercase text-gray-400 dark:text-gray-500 mb-4 tracking-wider">Draft PR Comments</h2>
+							<section class="border-t pt-6 dark:border-gray-800">
+								<h2
+									class="mb-4 text-sm font-bold tracking-wider text-gray-400 uppercase dark:text-gray-500"
+								>
+									Draft PR Comments
+								</h2>
 								{#if draftComments.length === 0}
-									<p class="text-sm text-gray-500 dark:text-gray-400 italic">No draft comments yet.</p>
+									<p class="text-sm text-gray-500 italic dark:text-gray-400">
+										No draft comments yet.
+									</p>
 								{:else}
 									<ul class="space-y-4">
 										{#each draftComments as comment}
-											<li class="text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 rounded-md p-3">
-												<div class="flex justify-between items-center mb-1">
+											<li
+												class="rounded-md border border-blue-100 bg-blue-50 p-3 text-sm dark:border-blue-900/30 dark:bg-blue-900/20"
+											>
+												<div class="mb-1 flex items-center justify-between">
 													{#if comment.line}
-														<span class="text-xs font-bold uppercase text-blue-700 dark:text-blue-400">Line {comment.line}</span>
+														<span
+															class="text-xs font-bold text-blue-700 uppercase dark:text-blue-400"
+															>Line {comment.line}</span
+														>
 													{:else}
-														<span class="text-xs font-bold uppercase text-blue-700 dark:text-blue-400">General</span>
+														<span
+															class="text-xs font-bold text-blue-700 uppercase dark:text-blue-400"
+															>General</span
+														>
 													{/if}
-													<span class="text-[10px] text-gray-400 dark:text-gray-500">{comment.status}</span>
+													<span class="text-[10px] text-gray-400 dark:text-gray-500"
+														>{comment.status}</span
+													>
 												</div>
 												<div class="text-gray-800 dark:text-gray-200">{comment.bodyMarkdown}</div>
 											</li>
@@ -1412,16 +1711,22 @@
 				</div>
 
 				<!-- Quick Comment Bar -->
-				<div class="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+				<div class="border-t border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
 					{#if activeTab === 'guidance'}
 						{#if showNoteForm}
-							<div class="space-y-3 bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+							<div
+								class="space-y-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+							>
 								<div>
-									<label for="severity" class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mb-1">Severity</label>
-									<select 
+									<label
+										for="severity"
+										class="mb-1 block text-[10px] font-bold text-gray-400 uppercase dark:text-gray-500"
+										>Severity</label
+									>
+									<select
 										id="severity"
 										bind:value={noteSeverity}
-										class="w-full text-sm border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 rounded-md focus:ring-blue-500 py-1"
+										class="w-full rounded-md border-gray-300 py-1 text-sm focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
 									>
 										<option value="nit">Nit</option>
 										<option value="suggestion">Suggestion</option>
@@ -1430,74 +1735,82 @@
 									</select>
 								</div>
 								<div>
-									<label for="note" class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mb-1">Note (Markdown)</label>
-									<textarea 
+									<label
+										for="note"
+										class="mb-1 block text-[10px] font-bold text-gray-400 uppercase dark:text-gray-500"
+										>Note (Markdown)</label
+									>
+									<textarea
 										id="note"
 										bind:value={noteContent}
 										placeholder="What did you find?"
-										class="w-full text-sm border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 rounded-md focus:ring-blue-500 min-h-[80px]"
+										class="min-h-[80px] w-full rounded-md border-gray-300 text-sm focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
 									></textarea>
 								</div>
 								<div class="flex gap-2">
-									<button 
+									<button
 										onclick={submitNote}
 										disabled={isSubmittingNote || !noteContent.trim()}
-										class="flex-1 bg-blue-600 text-white py-1.5 rounded-md hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50"
+										class="flex-1 rounded-md bg-blue-600 py-1.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
 									>
 										{isSubmittingNote ? 'Saving...' : 'Save Note'}
 									</button>
-									<button 
-										onclick={() => showNoteForm = false}
-										class="px-3 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-300 transition text-sm font-medium"
+									<button
+										onclick={() => (showNoteForm = false)}
+										class="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
 									>
 										Cancel
 									</button>
 								</div>
 							</div>
 						{:else}
-							<button 
-								onclick={() => showNoteForm = true}
-								class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition font-medium"
+							<button
+								onclick={() => (showNoteForm = true)}
+								class="w-full rounded-md bg-blue-600 py-2 font-medium text-white transition hover:bg-blue-700"
 							>
 								Add Review Note
 							</button>
 						{/if}
-					{:else}
-						{#if showCommentForm}
-							<div class="space-y-3 bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-								<div>
-									<label for="comment" class="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mb-1">Comment (Markdown)</label>
-									<textarea 
-										id="comment"
-										bind:value={commentContent}
-										placeholder="Write a comment for the PR..."
-										class="w-full text-sm border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 rounded-md focus:ring-blue-500 min-h-[80px]"
-									></textarea>
-								</div>
-								<div class="flex gap-2">
-									<button 
-										onclick={submitComment}
-										disabled={isSubmittingComment || !commentContent.trim()}
-										class="flex-1 bg-blue-600 text-white py-1.5 rounded-md hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50"
-									>
-										{isSubmittingComment ? 'Saving...' : 'Save Comment'}
-									</button>
-									<button 
-										onclick={() => showCommentForm = false}
-										class="px-3 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-300 transition text-sm font-medium"
-									>
-										Cancel
-									</button>
-								</div>
+					{:else if showCommentForm}
+						<div
+							class="space-y-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+						>
+							<div>
+								<label
+									for="comment"
+									class="mb-1 block text-[10px] font-bold text-gray-400 uppercase dark:text-gray-500"
+									>Comment (Markdown)</label
+								>
+								<textarea
+									id="comment"
+									bind:value={commentContent}
+									placeholder="Write a comment for the PR..."
+									class="min-h-[80px] w-full rounded-md border-gray-300 text-sm focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+								></textarea>
 							</div>
-						{:else}
-							<button 
-								onclick={() => showCommentForm = true}
-								class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition font-medium"
-							>
-								New Comment
-							</button>
-						{/if}
+							<div class="flex gap-2">
+								<button
+									onclick={submitComment}
+									disabled={isSubmittingComment || !commentContent.trim()}
+									class="flex-1 rounded-md bg-blue-600 py-1.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+								>
+									{isSubmittingComment ? 'Saving...' : 'Save Comment'}
+								</button>
+								<button
+									onclick={() => (showCommentForm = false)}
+									class="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+								>
+									Cancel
+								</button>
+							</div>
+						</div>
+					{:else}
+						<button
+							onclick={() => (showCommentForm = true)}
+							class="w-full rounded-md bg-blue-600 py-2 font-medium text-white transition hover:bg-blue-700"
+						>
+							New Comment
+						</button>
 					{/if}
 				</div>
 			</aside>
@@ -1688,7 +2001,8 @@
 		font-size: 13px;
 		resize: vertical;
 		min-height: 80px;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+		font-family:
+			-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
 	}
 
 	:global(.inline-comment-form .comment-textarea:focus) {
@@ -1879,8 +2193,9 @@
 	:global(.d2h-code-line-ctn.shiki-highlighted code) {
 		background: transparent !important;
 		padding: 0 !important;
-		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-			'Courier New', monospace;
+		font-family:
+			ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+			monospace;
 		font-size: inherit;
 		line-height: inherit;
 		opacity: 1 !important;
@@ -1918,17 +2233,75 @@
 	}
 
 	/* Markdown styles for guidance */
-	:global(.prose h1) { font-size: 1.25rem; line-height: 1.75rem; font-weight: 700; margin-bottom: 1rem; margin-top: 1.5rem; }
-	:global(.prose h2) { font-size: 1.125rem; line-height: 1.75rem; font-weight: 700; margin-bottom: 0.75rem; margin-top: 1.25rem; }
-	:global(.prose h3) { font-size: 1rem; line-height: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; margin-top: 1rem; }
-	:global(.prose p) { margin-bottom: 0.75rem; line-height: 1.625; }
-	:global(.prose ul) { list-style-type: disc; padding-left: 1.25rem; margin-bottom: 1rem; }
-	:global(.prose ol) { list-style-type: decimal; padding-left: 1.25rem; margin-bottom: 1rem; }
-	:global(.prose li) { margin-bottom: 0.25rem; }
-	:global(.prose code) { background-color: #f3f4f6; padding: 0.125rem 0.25rem; border-radius: 0.25rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 0.875rem; }
-	:global(.prose pre) { background-color: #111827; color: #f3f4f6; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; overflow-x: auto; }
-	:global(.prose pre code) { background-color: transparent; padding: 0; color: inherit; font-size: inherit; }
-	:global(.prose blockquote) { border-left-width: 4px; border-color: #e5e7eb; padding-left: 1rem; font-style: italic; margin-top: 1rem; margin-bottom: 1rem; }
+	:global(.prose h1) {
+		font-size: 1.25rem;
+		line-height: 1.75rem;
+		font-weight: 700;
+		margin-bottom: 1rem;
+		margin-top: 1.5rem;
+	}
+	:global(.prose h2) {
+		font-size: 1.125rem;
+		line-height: 1.75rem;
+		font-weight: 700;
+		margin-bottom: 0.75rem;
+		margin-top: 1.25rem;
+	}
+	:global(.prose h3) {
+		font-size: 1rem;
+		line-height: 1.5rem;
+		font-weight: 700;
+		margin-bottom: 0.5rem;
+		margin-top: 1rem;
+	}
+	:global(.prose p) {
+		margin-bottom: 0.75rem;
+		line-height: 1.625;
+	}
+	:global(.prose ul) {
+		list-style-type: disc;
+		padding-left: 1.25rem;
+		margin-bottom: 1rem;
+	}
+	:global(.prose ol) {
+		list-style-type: decimal;
+		padding-left: 1.25rem;
+		margin-bottom: 1rem;
+	}
+	:global(.prose li) {
+		margin-bottom: 0.25rem;
+	}
+	:global(.prose code) {
+		background-color: #f3f4f6;
+		padding: 0.125rem 0.25rem;
+		border-radius: 0.25rem;
+		font-family:
+			ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+			monospace;
+		font-size: 0.875rem;
+	}
+	:global(.prose pre) {
+		background-color: #111827;
+		color: #f3f4f6;
+		padding: 1rem;
+		border-radius: 0.5rem;
+		margin-bottom: 1rem;
+		overflow-x: auto;
+	}
+	:global(.prose pre code) {
+		background-color: transparent;
+		padding: 0;
+		color: inherit;
+		font-size: inherit;
+	}
+	:global(.prose blockquote) {
+		border-left-width: 4px;
+		border-color: #e5e7eb;
+		padding-left: 1rem;
+		font-style: italic;
+		margin-top: 1rem;
+		margin-bottom: 1rem;
+	}
 
 	/* AI Explanation Blocks */
 	:global(.ai-explanation-row) {
@@ -2012,7 +2385,9 @@
 
 	:global(.ai-line-range) {
 		font-size: 10px;
-		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+		font-family:
+			ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+			monospace;
 		color: #6b7280;
 		background: rgba(107, 114, 128, 0.1);
 		padding: 2px 6px;
@@ -2233,10 +2608,23 @@
 			background: #484f58;
 		}
 
-		:global(.prose h1), :global(.prose h2), :global(.prose h3) { color: #f9fafb; }
-		:global(.prose p), :global(.prose li) { color: #d1d5db; }
-		:global(.prose code) { background-color: #374151; color: #f9fafb; }
-		:global(.prose blockquote) { border-color: #374151; color: #9ca3af; }
+		:global(.prose h1),
+		:global(.prose h2),
+		:global(.prose h3) {
+			color: #f9fafb;
+		}
+		:global(.prose p),
+		:global(.prose li) {
+			color: #d1d5db;
+		}
+		:global(.prose code) {
+			background-color: #374151;
+			color: #f9fafb;
+		}
+		:global(.prose blockquote) {
+			border-color: #374151;
+			color: #9ca3af;
+		}
 
 		:global(.ai-explanation-content) {
 			background: linear-gradient(to right, #1e1b4b 0%, #2e1065 100%);
@@ -2518,10 +2906,23 @@
 		background: #484f58;
 	}
 
-	:global(.dark) :global(.prose h1), :global(.dark) :global(.prose h2), :global(.dark) :global(.prose h3) { color: #f9fafb; }
-	:global(.dark) :global(.prose p), :global(.dark) :global(.prose li) { color: #d1d5db; }
-	:global(.dark) :global(.prose code) { background-color: #374151; color: #f9fafb; }
-	:global(.dark) :global(.prose blockquote) { border-color: #374151; color: #9ca3af; }
+	:global(.dark) :global(.prose h1),
+	:global(.dark) :global(.prose h2),
+	:global(.dark) :global(.prose h3) {
+		color: #f9fafb;
+	}
+	:global(.dark) :global(.prose p),
+	:global(.dark) :global(.prose li) {
+		color: #d1d5db;
+	}
+	:global(.dark) :global(.prose code) {
+		background-color: #374151;
+		color: #f9fafb;
+	}
+	:global(.dark) :global(.prose blockquote) {
+		border-color: #374151;
+		color: #9ca3af;
+	}
 
 	:global(.dark) :global(.ai-explanation-content) {
 		background: linear-gradient(to right, #1e1b4b 0%, #2e1065 100%);
@@ -2668,4 +3069,3 @@
 		color: #c9d1d9;
 	}
 </style>
-

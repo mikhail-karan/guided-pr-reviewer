@@ -7,7 +7,9 @@ import { getAppOctokit } from '$lib/server/auth/github';
 import { v4 as uuidv4 } from 'uuid';
 import { addJob } from '$lib/server/jobs/queue';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, url }) => {
+	const state = url.searchParams.get('state') === 'closed' ? 'closed' : 'open';
+
 	const installation = await db
 		.select()
 		.from(table.githubInstallations)
@@ -23,7 +25,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		const { data: pulls } = await octokit.pulls.list({
 			owner: installation.accountLogin,
 			repo: params.repoName,
-			state: 'open'
+			state
 		});
 
 		// Also check for existing sessions
@@ -44,6 +46,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		return {
 			installation,
 			repoName: params.repoName,
+			state,
 			pulls,
 			sessions
 		};
@@ -87,7 +90,7 @@ export const actions: Actions = {
 		if (!repo) {
 			const octokit = getAppOctokit(installation.installationId);
 			const { data: repoData } = await octokit.repos.get({ owner, repo: repoName });
-			
+
 			repo = {
 				id: uuidv4(),
 				installationId,
@@ -116,11 +119,13 @@ export const actions: Actions = {
 		let pr = await db
 			.select()
 			.from(table.pullRequests)
-			.where(and(
-				eq(table.pullRequests.repoId, repo.id),
-				eq(table.pullRequests.number, prNumber),
-				eq(table.pullRequests.headSha, prData.head.sha)
-			))
+			.where(
+				and(
+					eq(table.pullRequests.repoId, repo.id),
+					eq(table.pullRequests.number, prNumber),
+					eq(table.pullRequests.headSha, prData.head.sha)
+				)
+			)
 			.get();
 
 		if (!pr) {
@@ -160,5 +165,3 @@ export const actions: Actions = {
 		throw redirect(303, `/app/sessions/${sessionId}`);
 	}
 };
-
-

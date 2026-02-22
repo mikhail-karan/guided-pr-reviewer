@@ -8,7 +8,7 @@ import { eq } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ url, locals }) => {
 	const installationIdParam = url.searchParams.get('installation_id');
-	
+
 	const log = (msg: string, data?: any) => {
 		console.log(`[Dashboard] ${msg}`, data ? JSON.stringify(data) : '');
 	};
@@ -62,10 +62,10 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		log('Starting App-level discovery...');
 		const appOctokit = getAppOctokit();
 		const { data: installations } = await appOctokit.apps.listInstallations({ per_page: 100 });
-		log(`App Identity found ${installations.length} total installations`, { 
-			logins: installations.map(i => i.account?.login) 
+		log(`App Identity found ${installations.length} total installations`, {
+			logins: installations.map((i) => i.account?.login)
 		});
-		
+
 		for (const inst of installations) {
 			await syncInstallation(inst.id.toString(), (inst.account as any)?.login || 'unknown');
 		}
@@ -78,11 +78,13 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		try {
 			log('Starting User-level discovery...');
 			const userOctokit = getUserOctokit(locals.user.accessTokenEncrypted);
-			const { data: { installations } } = await userOctokit.apps.listInstallationsForAuthenticatedUser();
-			log(`User Token found ${installations.length} accessible installations`, { 
-				logins: installations.map(i => i.account?.login) 
+			const {
+				data: { installations }
+			} = await userOctokit.apps.listInstallationsForAuthenticatedUser();
+			log(`User Token found ${installations.length} accessible installations`, {
+				logins: installations.map((i) => i.account?.login)
 			});
-			
+
 			for (const inst of installations) {
 				await syncInstallation(inst.id.toString(), (inst.account as any)?.login || 'unknown');
 			}
@@ -96,12 +98,14 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 	}
 
 	const installations = await db.select().from(table.githubInstallations).all();
-	log('Final installations in DB', { count: installations.length, logins: installations.map(i => i.accountLogin) });
-	
+	log('Final installations in DB', {
+		count: installations.length,
+		logins: installations.map((i) => i.accountLogin)
+	});
+
 	return {
 		installations,
 		githubAppName: ENV.GITHUB_APP_NAME,
 		userTokenValid: !locals.user || !!locals.user.accessTokenEncrypted // Simple check
 	};
 };
-

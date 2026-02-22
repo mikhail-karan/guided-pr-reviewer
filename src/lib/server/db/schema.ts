@@ -73,47 +73,55 @@ export const githubInstallations = sqliteTable('github_installations', {
 		.default(sql`(unixepoch())`)
 });
 
-export const repos = sqliteTable('repos', {
-	id: text('id').primaryKey(),
-	installationId: text('installation_id')
-		.notNull()
-		.references(() => githubInstallations.id),
-	owner: text('owner').notNull(),
-	name: text('name').notNull(),
-	defaultBranch: text('default_branch').notNull(),
-	codebaseContextJson: text('codebase_context_json'), // JSON: repo-level codebase context for AI reviews
-	createdAt: integer('created_at', { mode: 'timestamp' })
-		.notNull()
-		.default(sql`(unixepoch())`),
-	updatedAt: integer('updated_at', { mode: 'timestamp' })
-		.notNull()
-		.default(sql`(unixepoch())`)
-}, (table) => ({
-	unq: sql`UNIQUE(${table.owner}, ${table.name})`
-}));
+export const repos = sqliteTable(
+	'repos',
+	{
+		id: text('id').primaryKey(),
+		installationId: text('installation_id')
+			.notNull()
+			.references(() => githubInstallations.id),
+		owner: text('owner').notNull(),
+		name: text('name').notNull(),
+		defaultBranch: text('default_branch').notNull(),
+		codebaseContextJson: text('codebase_context_json'), // JSON: repo-level codebase context for AI reviews
+		createdAt: integer('created_at', { mode: 'timestamp' })
+			.notNull()
+			.default(sql`(unixepoch())`),
+		updatedAt: integer('updated_at', { mode: 'timestamp' })
+			.notNull()
+			.default(sql`(unixepoch())`)
+	},
+	(table) => ({
+		unq: sql`UNIQUE(${table.owner}, ${table.name})`
+	})
+);
 
-export const pullRequests = sqliteTable('pull_requests', {
-	id: text('id').primaryKey(),
-	repoId: text('repo_id')
-		.notNull()
-		.references(() => repos.id),
-	number: integer('number').notNull(),
-	title: text('title').notNull(),
-	authorLogin: text('author_login').notNull(),
-	baseRef: text('base_ref').notNull(),
-	headRef: text('head_ref').notNull(),
-	baseSha: text('base_sha').notNull(),
-	headSha: text('head_sha').notNull(),
-	state: text('state').notNull(),
-	createdAt: integer('created_at', { mode: 'timestamp' })
-		.notNull()
-		.default(sql`(unixepoch())`),
-	updatedAt: integer('updated_at', { mode: 'timestamp' })
-		.notNull()
-		.default(sql`(unixepoch())`)
-}, (table) => ({
-	unq: sql`UNIQUE(${table.repoId}, ${table.number}, ${table.headSha})`
-}));
+export const pullRequests = sqliteTable(
+	'pull_requests',
+	{
+		id: text('id').primaryKey(),
+		repoId: text('repo_id')
+			.notNull()
+			.references(() => repos.id),
+		number: integer('number').notNull(),
+		title: text('title').notNull(),
+		authorLogin: text('author_login').notNull(),
+		baseRef: text('base_ref').notNull(),
+		headRef: text('head_ref').notNull(),
+		baseSha: text('base_sha').notNull(),
+		headSha: text('head_sha').notNull(),
+		state: text('state').notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp' })
+			.notNull()
+			.default(sql`(unixepoch())`),
+		updatedAt: integer('updated_at', { mode: 'timestamp' })
+			.notNull()
+			.default(sql`(unixepoch())`)
+	},
+	(table) => ({
+		unq: sql`UNIQUE(${table.repoId}, ${table.number}, ${table.headSha})`
+	})
+);
 
 // --- REVIEW SESSIONS ---
 

@@ -10,7 +10,7 @@ const worker = new Worker(
 	'review-tasks',
 	async (job: Job) => {
 		console.log(`Processing job ${job.id} of type ${job.name}`);
-		
+
 		try {
 			switch (job.name) {
 				case 'ingest_pr':
@@ -22,13 +22,13 @@ const worker = new Worker(
 				case 'build_context_pack':
 					await buildContextPackJob(job.data.stepId);
 					break;
-			case 'generate_ai_guidance':
-				await generateAiGuidanceJob(job.data.sessionId);
-				break;
-			case 'gather_repo_context':
-				await gatherRepoContextJob(job.data.repoId);
-				break;
-			default:
+				case 'generate_ai_guidance':
+					await generateAiGuidanceJob(job.data.sessionId);
+					break;
+				case 'gather_repo_context':
+					await gatherRepoContextJob(job.data.repoId);
+					break;
+				default:
 					console.warn(`Unknown job type: ${job.name}`);
 			}
 		} catch (error) {
@@ -48,4 +48,3 @@ worker.on('failed', (job, err) => {
 });
 
 console.log('Worker started and waiting for jobs...');
-

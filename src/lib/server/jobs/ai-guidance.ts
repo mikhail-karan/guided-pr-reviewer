@@ -40,7 +40,7 @@ export async function generateAiGuidanceJob(sessionId: string) {
 		.select({
 			session: table.reviewSessions,
 			pr: table.pullRequests,
-			repo: table.repos,
+			repo: table.repos
 		})
 		.from(table.reviewSessions)
 		.innerJoin(table.pullRequests, eq(table.reviewSessions.pullRequestId, table.pullRequests.id))
@@ -183,12 +183,16 @@ export async function generateAiGuidanceJob(sessionId: string) {
 
 						// Split patch into individual hunks (each starts with @@)
 						// Match hunks more flexibly - handle different line endings and whitespace
-						const hunkMatches = fileHunk.patch.matchAll(/@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@[\r\n]+([\s\S]*?)(?=@@|$)/g);
+						const hunkMatches = fileHunk.patch.matchAll(
+							/@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@[\r\n]+([\s\S]*?)(?=@@|$)/g
+						);
 						const hunks = Array.from(hunkMatches);
 
 						if (hunks.length === 0) {
 							// If no hunks found, treat the whole patch as one hunk
-							const lineRangeMatch = fileHunk.patch.match(/@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@/);
+							const lineRangeMatch = fileHunk.patch.match(
+								/@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@/
+							);
 							const lineRange = lineRangeMatch
 								? `L${lineRangeMatch[3]}-${lineRangeMatch[4] ? parseInt(lineRangeMatch[3]) + parseInt(lineRangeMatch[4]) - 1 : lineRangeMatch[3]}`
 								: '';
@@ -272,5 +276,3 @@ export async function generateAiGuidanceJob(sessionId: string) {
 		}
 	}
 }
-
-

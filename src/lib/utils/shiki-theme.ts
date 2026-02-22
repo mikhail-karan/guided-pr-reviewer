@@ -10,7 +10,8 @@ export function getShikiTheme(): string {
 
 	// Check for dark mode class on html or body
 	// This will be updated when dark mode is implemented
-	const isDark = document.documentElement.classList.contains('dark') ||
+	const isDark =
+		document.documentElement.classList.contains('dark') ||
 		document.body.classList.contains('dark') ||
 		window.matchMedia('(prefers-color-scheme: dark)').matches;
 

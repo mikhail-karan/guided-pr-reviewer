@@ -63,7 +63,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		.orderBy(table.reviewSteps.orderIndex)
 		.all();
 
-	const currentIndex = allSteps.findIndex(s => s.id === params.stepId);
+	const currentIndex = allSteps.findIndex((s) => s.id === params.stepId);
 	const prevStep = currentIndex > 0 ? allSteps[currentIndex - 1] : null;
 	const nextStep = currentIndex < allSteps.length - 1 ? allSteps[currentIndex + 1] : null;
 
@@ -103,5 +103,3 @@ export const actions: Actions = {
 		return { success: true };
 	}
 };
-
-

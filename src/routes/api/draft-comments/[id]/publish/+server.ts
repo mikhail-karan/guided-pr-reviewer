@@ -5,6 +5,11 @@ import * as table from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { getAppOctokit } from '$lib/server/auth/github';
 
+function formatInlineFallbackComment(path: string | null, line: number | null, body: string) {
+	const location = path ? `\`${path}${line != null ? `:${line}` : ''}\`` : 'this file';
+	return `Inline comment fallback for ${location}:\n\n${body}`;
+}
+
 export const POST: RequestHandler = async ({ params, locals }) => {
 	if (!locals.user) throw error(401, 'Unauthorized');
 
@@ -22,7 +27,10 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 		.innerJoin(table.reviewSessions, eq(table.reviewSteps.sessionId, table.reviewSessions.id))
 		.innerJoin(table.pullRequests, eq(table.reviewSessions.pullRequestId, table.pullRequests.id))
 		.innerJoin(table.repos, eq(table.pullRequests.repoId, table.repos.id))
-		.innerJoin(table.githubInstallations, eq(table.repos.installationId, table.githubInstallations.id))
+		.innerJoin(
+			table.githubInstallations,
+			eq(table.repos.installationId, table.githubInstallations.id)
+		)
 		.where(eq(table.draftComments.id, params.id))
 		.get();
 
@@ -38,19 +46,54 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 			.where(eq(table.draftComments.id, draft.draft.id));
 
 		let response;
+		const { data: latestPr } = await octokit.pulls.get({
+			owner: draft.repo.owner,
+			repo: draft.repo.name,
+			pull_number: draft.pr.number
+		});
+		const isClosedPr = latestPr.state === 'closed';
 
 		if (draft.draft.targetType === 'inline') {
-			response = await octokit.pulls.createReviewComment({
-				owner: draft.repo.owner,
-				repo: draft.repo.name,
-				pull_number: draft.pr.number,
-				body: draft.draft.bodyMarkdown,
-				commit_id: draft.pr.headSha,
-				path: draft.draft.path!,
-				line: draft.draft.line!,
-				side: draft.draft.side as 'LEFT' | 'RIGHT' | undefined,
-				start_line: draft.draft.startLine || undefined
-			});
+			if (isClosedPr) {
+				response = await octokit.issues.createComment({
+					owner: draft.repo.owner,
+					repo: draft.repo.name,
+					issue_number: draft.pr.number,
+					body: formatInlineFallbackComment(
+						draft.draft.path,
+						draft.draft.line,
+						draft.draft.bodyMarkdown
+					)
+				});
+			} else {
+				try {
+					response = await octokit.pulls.createReviewComment({
+						owner: draft.repo.owner,
+						repo: draft.repo.name,
+						pull_number: draft.pr.number,
+						body: draft.draft.bodyMarkdown,
+						commit_id: draft.pr.headSha,
+						path: draft.draft.path!,
+						line: draft.draft.line!,
+						side: draft.draft.side as 'LEFT' | 'RIGHT' | undefined,
+						start_line: draft.draft.startLine || undefined
+					});
+				} catch (inlineErr: any) {
+					if (inlineErr?.status !== 422) {
+						throw inlineErr;
+					}
+					response = await octokit.issues.createComment({
+						owner: draft.repo.owner,
+						repo: draft.repo.name,
+						issue_number: draft.pr.number,
+						body: formatInlineFallbackComment(
+							draft.draft.path,
+							draft.draft.line,
+							draft.draft.bodyMarkdown
+						)
+					});
+				}
+			}
 		} else {
 			response = await octokit.issues.createComment({
 				owner: draft.repo.owner,
@@ -80,9 +123,7 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 				updatedAt: new Date()
 			})
 			.where(eq(table.draftComments.id, draft.draft.id));
-		
+
 		throw error(500, 'Failed to publish to GitHub');
 	}
 };
-
-

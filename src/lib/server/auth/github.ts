@@ -48,11 +48,11 @@ export async function getAccessToken(code: string) {
 	}
 
 	const data = await response.json();
-	
+
 	if (data.error) {
 		throw new Error(`GitHub OAuth error: ${data.error_description || data.error}`);
 	}
-	
+
 	return data as { access_token: string; token_type: string; scope: string };
 }
 
@@ -64,4 +64,3 @@ export async function getGithubUser(accessToken: string) {
 	const { data } = await octokit.users.getAuthenticated();
 	return data;
 }
-

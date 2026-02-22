@@ -16,7 +16,10 @@ export const load: PageServerLoad = async ({ params }) => {
 		.from(table.reviewSessions)
 		.innerJoin(table.pullRequests, eq(table.reviewSessions.pullRequestId, table.pullRequests.id))
 		.innerJoin(table.repos, eq(table.pullRequests.repoId, table.repos.id))
-		.innerJoin(table.githubInstallations, eq(table.repos.installationId, table.githubInstallations.id))
+		.innerJoin(
+			table.githubInstallations,
+			eq(table.repos.installationId, table.githubInstallations.id)
+		)
 		.where(eq(table.reviewSessions.id, params.sessionId))
 		.get();
 
@@ -61,4 +64,3 @@ export const load: PageServerLoad = async ({ params }) => {
 		steps
 	};
 };
-

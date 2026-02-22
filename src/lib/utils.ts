@@ -53,8 +53,12 @@ export function safeParse<T>(
 		}
 
 		// Only log if we couldn't even fall back to wrapping
-		console.error('Failed to parse JSON and no suitable fallback wrapper found:', e, 'Content:', json);
+		console.error(
+			'Failed to parse JSON and no suitable fallback wrapper found:',
+			e,
+			'Content:',
+			json
+		);
 		return fallback;
 	}
 }
-

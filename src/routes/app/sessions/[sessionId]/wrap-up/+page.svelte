@@ -11,7 +11,9 @@
 		data.draftComments.some((dc) => dc.comment.status === 'draft')
 	);
 	const hasInlineComments = $derived(
-		data.draftComments.some((dc) => dc.comment.targetType === 'inline' && dc.comment.status === 'draft')
+		data.draftComments.some(
+			(dc) => dc.comment.targetType === 'inline' && dc.comment.status === 'draft'
+		)
 	);
 	// Feedback is required if: REQUEST_CHANGES, or no draft comments at all
 	// (if there are draft comments, backend will handle generating body if needed)
@@ -22,7 +24,9 @@
 
 		// If REQUEST_CHANGES, body is always required
 		if (reviewEvent === 'REQUEST_CHANGES' && !hasBody) {
-			alert('Please provide feedback when requesting changes. GitHub requires a comment for this review type.');
+			alert(
+				'Please provide feedback when requesting changes. GitHub requires a comment for this review type.'
+			);
 			return;
 		}
 
@@ -49,24 +53,34 @@
 	}
 </script>
 
-<div class="max-w-4xl mx-auto p-6">
-	<div class="flex items-center gap-4 mb-8">
-		<a href="/app/sessions/{data.session.id}" class="text-blue-600 dark:text-blue-400 hover:underline">← Back to Plan</a>
+<div class="mx-auto max-w-4xl p-6">
+	<div class="mb-8 flex items-center gap-4">
+		<a
+			href="/app/sessions/{data.session.id}"
+			class="text-blue-600 hover:underline dark:text-blue-400">← Back to Plan</a
+		>
 		<h1 class="text-3xl font-bold dark:text-gray-100">Review Wrap-up: {data.pr.title}</h1>
 	</div>
 
-	<div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+	<div class="mb-12 grid grid-cols-1 gap-8 md:grid-cols-2">
 		<section>
-			<h2 class="text-xl font-semibold mb-4 dark:text-gray-100">Consolidated Notes</h2>
+			<h2 class="mb-4 text-xl font-semibold dark:text-gray-100">Consolidated Notes</h2>
 			{#if data.notes.length === 0}
-				<p class="text-gray-500 dark:text-gray-400 italic">No notes added during this review.</p>
+				<p class="text-gray-500 italic dark:text-gray-400">No notes added during this review.</p>
 			{:else}
 				<ul class="space-y-4">
 					{#each data.notes as { note, step }}
-						<li class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm">
-							<div class="flex justify-between items-start mb-2">
-								<span class="text-xs font-bold uppercase text-gray-400 dark:text-gray-500">{step.title}</span>
-								<span class="text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 dark:text-gray-300 font-medium">{note.severity}</span>
+						<li
+							class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+						>
+							<div class="mb-2 flex items-start justify-between">
+								<span class="text-xs font-bold text-gray-400 uppercase dark:text-gray-500"
+									>{step.title}</span
+								>
+								<span
+									class="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium dark:bg-gray-700 dark:text-gray-300"
+									>{note.severity}</span
+								>
 							</div>
 							<p class="text-sm text-gray-700 dark:text-gray-300">{note.noteMarkdown}</p>
 						</li>
@@ -76,18 +90,27 @@
 		</section>
 
 		<section>
-			<h2 class="text-xl font-semibold mb-4 dark:text-gray-100">Pending Draft Comments</h2>
-			{#if data.draftComments.filter(d => d.comment.status === 'draft').length === 0}
-				<p class="text-gray-500 dark:text-gray-400 italic">No unpublished draft comments.</p>
+			<h2 class="mb-4 text-xl font-semibold dark:text-gray-100">Pending Draft Comments</h2>
+			{#if data.draftComments.filter((d) => d.comment.status === 'draft').length === 0}
+				<p class="text-gray-500 italic dark:text-gray-400">No unpublished draft comments.</p>
 			{:else}
 				<ul class="space-y-4">
-					{#each data.draftComments.filter(d => d.comment.status === 'draft') as { comment, step }}
-						<li class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 rounded-lg p-4">
-							<div class="flex justify-between items-start mb-2">
-								<span class="text-xs font-bold uppercase text-amber-600 dark:text-amber-400">{step.title}</span>
-								<span class="text-xs px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 font-medium">{comment.targetType}</span>
+					{#each data.draftComments.filter((d) => d.comment.status === 'draft') as { comment, step }}
+						<li
+							class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/30 dark:bg-amber-900/20"
+						>
+							<div class="mb-2 flex items-start justify-between">
+								<span class="text-xs font-bold text-amber-600 uppercase dark:text-amber-400"
+									>{step.title}</span
+								>
+								<span
+									class="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
+									>{comment.targetType}</span
+								>
 							</div>
-							<p class="text-sm text-amber-900 dark:text-amber-200 line-clamp-2">{comment.bodyMarkdown}</p>
+							<p class="line-clamp-2 text-sm text-amber-900 dark:text-amber-200">
+								{comment.bodyMarkdown}
+							</p>
 						</li>
 					{/each}
 				</ul>
@@ -95,38 +118,62 @@
 		</section>
 	</div>
 
-	<section class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-8 shadow-md">
-		<h2 class="text-2xl font-bold mb-6 dark:text-gray-100">Submit GitHub Review</h2>
-		
+	<section
+		class="rounded-xl border border-gray-200 bg-white p-8 shadow-md dark:border-gray-700 dark:bg-gray-800"
+	>
+		<h2 class="mb-6 text-2xl font-bold dark:text-gray-100">Submit GitHub Review</h2>
+
 		<div class="space-y-6">
 			<div>
-				<span class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Review Status</span>
+				<span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+					>Review Status</span
+				>
 				<div class="flex gap-4">
-					<label class="flex items-center gap-2 cursor-pointer">
-						<input type="radio" bind:group={reviewEvent} value="APPROVE" class="text-green-600 focus:ring-green-500 dark:bg-gray-700 dark:border-gray-600" />
+					<label class="flex cursor-pointer items-center gap-2">
+						<input
+							type="radio"
+							bind:group={reviewEvent}
+							value="APPROVE"
+							class="text-green-600 focus:ring-green-500 dark:border-gray-600 dark:bg-gray-700"
+						/>
 						<span class="font-medium text-green-700 dark:text-green-400">Approve</span>
 					</label>
-					<label class="flex items-center gap-2 cursor-pointer">
-						<input type="radio" bind:group={reviewEvent} value="REQUEST_CHANGES" class="text-red-600 focus:ring-red-500 dark:bg-gray-700 dark:border-gray-600" />
+					<label class="flex cursor-pointer items-center gap-2">
+						<input
+							type="radio"
+							bind:group={reviewEvent}
+							value="REQUEST_CHANGES"
+							class="text-red-600 focus:ring-red-500 dark:border-gray-600 dark:bg-gray-700"
+						/>
 						<span class="font-medium text-red-700 dark:text-red-400">Request Changes</span>
 					</label>
-					<label class="flex items-center gap-2 cursor-pointer">
-						<input type="radio" bind:group={reviewEvent} value="COMMENT" class="text-gray-600 focus:ring-gray-500 dark:bg-gray-700 dark:border-gray-600" />
+					<label class="flex cursor-pointer items-center gap-2">
+						<input
+							type="radio"
+							bind:group={reviewEvent}
+							value="COMMENT"
+							class="text-gray-600 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-700"
+						/>
 						<span class="font-medium text-gray-700 dark:text-gray-300">Comment only</span>
 					</label>
 				</div>
 			</div>
 
 			<div>
-				<label for="review-body" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+				<label
+					for="review-body"
+					class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+				>
 					Overall Feedback {isFeedbackRequired ? '(required)' : '(optional)'}
 				</label>
 				<textarea
 					id="review-body"
 					bind:value={reviewBody}
 					rows="4"
-					class="w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-					placeholder={isFeedbackRequired ? 'Please provide feedback...' : 'Add a top-level comment for this review...'}
+					class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+					placeholder={isFeedbackRequired
+						? 'Please provide feedback...'
+						: 'Add a top-level comment for this review...'}
 					required={isFeedbackRequired}
 				></textarea>
 				{#if isFeedbackRequired}
@@ -144,13 +191,15 @@
 				{/if}
 			</div>
 
-			<div class="pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-4">
-				<button class="px-6 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors">
+			<div class="flex justify-end gap-4 border-t border-gray-100 pt-4 dark:border-gray-700">
+				<button
+					class="rounded-lg border border-gray-300 px-6 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+				>
 					Export as Markdown
 				</button>
 				<button
 					onclick={submitReview}
-					class="px-8 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-bold"
+					class="rounded-lg bg-blue-600 px-8 py-2 font-bold text-white transition hover:bg-blue-700"
 				>
 					Submit Review to GitHub
 				</button>
@@ -158,4 +207,3 @@
 		</div>
 	</section>
 </div>
-
